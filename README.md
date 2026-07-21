@@ -48,6 +48,47 @@ npm install
 npm run dev
 ```
 
+## Web and phone, from one codebase
+
+This project is set up as a **PWA (Progressive Web App)**. That means:
+
+- On desktop/laptop, it's just a normal website.
+- On a phone, opening the site and choosing **"Add to Home Screen"**
+  (Safari: Share → Add to Home Screen; Chrome: menu → Install app) puts a
+  real app icon on the home screen. It opens full-screen, no browser bar,
+  with its own splash color — no App Store submission needed.
+
+No separate phone codebase to maintain — one set of components, one set of
+hooks, both surfaces.
+
+**What's already wired up:**
+- `vite-plugin-pwa` (in `vite.config.js`) — generates the manifest + service
+  worker automatically on build.
+- `public/icons/` — the home-screen icons (192px, 512px, and the iOS
+  touch-icon).
+- Meta tags in `index.html` for iOS-specific "add to home screen" behavior
+  and the status bar color.
+- `env(safe-area-inset-*)` padding in `index.css` so content doesn't sit
+  under a phone's notch or home indicator once installed.
+
+To see the installed-app behavior, run a production build and open it —
+`npm run dev` doesn't register the service worker:
+```bash
+npm run build
+npm run preview
+```
+Then open the preview URL on your phone (same wifi network) and add it to
+your home screen.
+
+### If you later want actual App Store / Play Store listings
+
+A PWA covers "installable app icon" well, but doesn't get you into the
+app stores. When you're ready for that, the standard next step is
+**Capacitor** — it wraps this same React app in a native shell so you can
+ship it to both stores with very little code change (you're not rewriting
+components, just adding a thin native wrapper). Worth doing once the app
+is further along; not needed to start.
+
 ## Adding persistence (next natural step)
 
 Right now `useGoals` and `usePlanner` hold state in memory with `useState`.
