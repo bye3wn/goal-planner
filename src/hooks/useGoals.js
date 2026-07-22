@@ -6,7 +6,7 @@ import { makeId } from "../utils/id";
 // never mutate goal state directly — they call these functions.
 export function useGoals() {
   const [goals, setGoals] = useState(seedGoals);
-  const [expanded, setExpanded] = useState({ g1: true, g2: true });
+  const [expanded, setExpanded] = useState({ g1: true, g2: true, g3: true });
 
   function toggleExpanded(goalId) {
     setExpanded((e) => ({ ...e, [goalId]: !e[goalId] }));
@@ -20,17 +20,31 @@ export function useGoals() {
     return id;
   }
 
-  function addMilestone(goalId, title) {
+  // targetAmount/targetUnit are optional. Pass them when the milestone is a
+  // quantity to work down (e.g. "30 applications") rather than a single
+  // checkbox (e.g. "Rebuild resume").
+  function addMilestone(goalId, title, targetAmount, targetUnit) {
     if (!title.trim()) return;
+    const amount = Number(targetAmount);
+    const target = amount > 0 ? { amount, unit: (targetUnit || "").trim() || "done" } : null;
     setGoals((gs) =>
       gs.map((g) =>
         g.id === goalId
-          ? { ...g, milestones: [...g.milestones, { id: makeId("m"), title: title.trim(), done: false }] }
+          ? {
+              ...g,
+              milestones: [
+                ...g.milestones,
+                { id: makeId("m"), title: title.trim(), done: false, target, progress: 0 },
+              ],
+            }
           : g
       )
     );
   }
 
+  // Manual toggle — only meaningful for milestones WITHOUT a quantity
+  // target. Target-based milestones complete themselves via contributions
+  // (see addMilestoneProgress).
   function toggleMilestone(goalId, milestoneId) {
     setGoals((gs) =>
       gs.map((g) =>
@@ -38,8 +52,28 @@ export function useGoals() {
           ? {
               ...g,
               milestones: g.milestones.map((m) =>
-                m.id === milestoneId ? { ...m, done: !m.done } : m
+                m.id === milestoneId && !m.target ? { ...m, done: !m.done } : m
               ),
+            }
+          : g
+      )
+    );
+  }
+
+  // Adds (or, with a negative delta, removes) progress toward a milestone's
+  // quantity target. Called when a contributing task is checked/unchecked.
+  // Automatically marks the milestone done once progress reaches the target.
+  function addMilestoneProgress(goalId, milestoneId, delta) {
+    setGoals((gs) =>
+      gs.map((g) =>
+        g.id === goalId
+          ? {
+              ...g,
+              milestones: g.milestones.map((m) => {
+                if (m.id !== milestoneId || !m.target) return m;
+                const progress = Math.max(0, Math.min(m.target.amount, m.progress + delta));
+                return { ...m, progress, done: progress >= m.target.amount };
+              }),
             }
           : g
       )
@@ -57,6 +91,7 @@ export function useGoals() {
     addGoal,
     addMilestone,
     toggleMilestone,
+    addMilestoneProgress,
     goalColor,
   };
 }

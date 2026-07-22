@@ -14,6 +14,7 @@ export default function HourRow({
   onDragStartTask,
   onToggleTaskDone,
   onDeleteTask,
+  onStopRepeating,
   onAddTask,
 }) {
   const [adding, setAdding] = useState(false);
@@ -37,6 +38,7 @@ export default function HourRow({
             onDragStart={() => onDragStartTask(t.id)}
             onToggleDone={() => onToggleTaskDone(t.id)}
             onDelete={() => onDeleteTask(t.id)}
+            onStopRepeating={onStopRepeating}
           />
         ))}
 
@@ -44,8 +46,8 @@ export default function HourRow({
           <QuickAddForm
             goals={goals}
             onCancel={() => setAdding(false)}
-            onSubmit={({ title, goalId }) => {
-              onAddTask({ title, hour, goalId });
+            onSubmit={(payload) => {
+              onAddTask({ ...payload, hour });
               setAdding(false);
             }}
           />

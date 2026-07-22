@@ -1,8 +1,8 @@
 import React from "react";
-import { GripVertical, Circle, CheckCircle2, X } from "lucide-react";
+import { GripVertical, Circle, CheckCircle2, X, Repeat } from "lucide-react";
 import { COLORS } from "../../constants/theme";
 
-export default function TaskCard({ task, color, onDragStart, onToggleDone, onDelete }) {
+export default function TaskCard({ task, color, onDragStart, onToggleDone, onDelete, onStopRepeating }) {
   return (
     <div
       draggable
@@ -22,11 +22,32 @@ export default function TaskCard({ task, color, onDragStart, onToggleDone, onDel
       <span className="text-sm flex-1 truncate" style={{ textDecoration: task.done ? "line-through" : "none" }}>
         {task.title}
       </span>
+
+      {task.contributionAmount ? (
+        <span
+          className="font-mono text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0"
+          style={{ background: COLORS.canvas, color: COLORS.inkFaint }}
+        >
+          +{task.contributionAmount}
+        </span>
+      ) : null}
+
       {task.duration > 1 && (
         <span className="font-mono text-[10px]" style={{ color: COLORS.inkFaint }}>
           {task.duration}h
         </span>
       )}
+
+      {task.templateId && (
+        <button
+          onClick={() => onStopRepeating(task.templateId)}
+          title="Repeats daily — click to stop repeating"
+          className="flex-shrink-0"
+        >
+          <Repeat size={13} color={COLORS.inkFaint} />
+        </button>
+      )}
+
       <button onClick={onDelete} className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
         <X size={13} color={COLORS.inkFaint} />
       </button>

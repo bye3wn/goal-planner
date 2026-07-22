@@ -10,6 +10,7 @@ export default function DayPlanner({
   onDragStartTask,
   onToggleTaskDone,
   onDeleteTask,
+  onStopRepeating,
   onAddTask,
 }) {
   return (
@@ -26,6 +27,7 @@ export default function DayPlanner({
             onDragStartTask={onDragStartTask}
             onToggleTaskDone={onToggleTaskDone}
             onDeleteTask={onDeleteTask}
+            onStopRepeating={onStopRepeating}
             onAddTask={onAddTask}
           />
         ))}

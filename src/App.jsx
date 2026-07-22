@@ -10,7 +10,16 @@ import DayPlanner from "./components/planner/DayPlanner";
 // components) and holds no logic of its own. If you find yourself adding
 // a useState or a helper function here, it probably belongs in a hook instead.
 export default function App() {
-  const { goals, expanded, toggleExpanded, addGoal, addMilestone, toggleMilestone, goalColor } = useGoals();
+  const {
+    goals,
+    expanded,
+    toggleExpanded,
+    addGoal,
+    addMilestone,
+    toggleMilestone,
+    addMilestoneProgress,
+    goalColor,
+  } = useGoals();
 
   const {
     currentDate,
@@ -20,9 +29,10 @@ export default function App() {
     addTask,
     toggleTaskDone,
     deleteTask,
+    stopRepeating,
     setDraggedId,
     handleDrop,
-  } = usePlanner();
+  } = usePlanner({ onTaskContribution: addMilestoneProgress });
 
   return (
     <div style={{ background: COLORS.canvas, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }} className="w-full min-h-screen flex flex-col">
@@ -52,6 +62,7 @@ export default function App() {
           onDragStartTask={setDraggedId}
           onToggleTaskDone={toggleTaskDone}
           onDeleteTask={deleteTask}
+          onStopRepeating={stopRepeating}
           onAddTask={addTask}
         />
       </div>
