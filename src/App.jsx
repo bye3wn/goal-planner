@@ -1,38 +1,38 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { COLORS, FONT_IMPORT_URL } from "./constants/theme";
 import { useGoals } from "./hooks/useGoals";
 import { usePlanner } from "./hooks/usePlanner";
 import Header from "./components/Header";
 import Sidebar from "./components/sidebar/Sidebar";
-import DayPlanner from "./components/planner/DayPlanner";
+import CalendarGrid from "./components/planner/CalendarGrid";
+import TasksPanel from "./components/planner/TasksPanel";
+import ItemModal from "./components/planner/ItemModal";
 
 // This file should stay thin: it connects state (from hooks) to UI (from
-// components) and holds no logic of its own. If you find yourself adding
-// a useState or a helper function here, it probably belongs in a hook instead.
-//
-// One exception: milestoneStats below. Whether a milestone is "done" needs
-// BOTH goal data (useGoals) and task data (usePlanner), and neither hook
-// knows the other exists on purpose — so the merge happens here.
+// components) and holds no logic of its own, with two exceptions:
+//   - milestoneStats: needs BOTH goal data and task data, and neither hook
+//     knows the other exists on purpose, so the merge happens here.
+//   - modal open/edit state: which item (if any) is being created/edited is
+//     UI-only state that both the grid and the tasks panel need to trigger.
 export default function App() {
   const { goals, expanded, toggleExpanded, addGoal, addMilestone, addMilestoneProgress, goalColor } = useGoals();
 
   const {
     currentDate,
-    tasksByHour,
-    allTasks,
+    events,
+    tasks,
+    allItems,
     goToDay,
     goToToday,
-    addTask,
-    toggleTaskDone,
-    deleteTask,
-    stopRepeating,
+    saveItem,
+    toggleItemDone,
+    deleteItem,
     setDraggedId,
     handleDrop,
-  } = usePlanner({ onTaskContribution: addMilestoneProgress });
+  } = usePlanner({ onItemContribution: addMilestoneProgress });
 
-  // Derives each milestone's completion state and display label from its
-  // subtasks. Milestones are never toggled by hand — this is the single
-  // source of truth for "done" everywhere in the sidebar.
+  const [modalState, setModalState] = useState(null); // null | { initial: {...} }
+
   const milestoneStats = useMemo(() => {
     const map = {};
     for (const g of goals) {
@@ -45,9 +45,9 @@ export default function App() {
             label: remaining === 0 ? "done" : `${remaining} ${m.target.unit} left`,
           };
         } else {
-          const linked = allTasks.filter((t) => t.milestoneId === m.id);
+          const linked = allItems.filter((i) => i.milestoneId === m.id);
           const total = linked.length;
-          const doneCount = linked.filter((t) => t.done).length;
+          const doneCount = linked.filter((i) => i.done).length;
           const pct = total ? Math.round((doneCount / total) * 100) : 0;
           map[m.id] = {
             kind: "checklist",
@@ -58,7 +58,17 @@ export default function App() {
       }
     }
     return map;
-  }, [goals, allTasks]);
+  }, [goals, allItems]);
+
+  function openCreateEvent(start) {
+    setModalState({ initial: { kind: "event", start, duration: 1 } });
+  }
+  function openCreateTask() {
+    setModalState({ initial: { kind: "task" } });
+  }
+  function openEdit(item) {
+    setModalState({ initial: item });
+  }
 
   return (
     <div style={{ background: COLORS.canvas, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }} className="w-full min-h-screen flex flex-col">
@@ -80,18 +90,31 @@ export default function App() {
           onAddGoal={addGoal}
           onAddMilestone={addMilestone}
         />
-        <DayPlanner
-          tasksByHour={tasksByHour}
-          goals={goals}
+        <CalendarGrid
+          events={events}
           goalColor={goalColor}
           onDrop={handleDrop}
-          onDragStartTask={setDraggedId}
-          onToggleTaskDone={toggleTaskDone}
-          onDeleteTask={deleteTask}
-          onStopRepeating={stopRepeating}
-          onAddTask={addTask}
+          onDragStartEvent={setDraggedId}
+          onSlotClick={openCreateEvent}
+          onEventClick={openEdit}
+        />
+        <TasksPanel
+          tasks={tasks}
+          goalColor={goalColor}
+          onToggleDone={toggleItemDone}
+          onTaskClick={openEdit}
+          onAddTask={openCreateTask}
         />
       </div>
+
+      <ItemModal
+        open={!!modalState}
+        initial={modalState?.initial}
+        goals={goals}
+        onSave={saveItem}
+        onDelete={deleteItem}
+        onClose={() => setModalState(null)}
+      />
     </div>
   );
 }

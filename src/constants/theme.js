@@ -30,5 +30,25 @@ export const HOURS = Array.from(
   (_, i) => i + DAY_START_HOUR
 );
 
+// Pixel height of one hour in the calendar grid. Event block height is
+// duration (in hours) * this value, so blocks are visually proportional to
+// how long the event actually takes — same idea as Google Calendar.
+export const HOUR_HEIGHT_PX = 60;
+
+// Half-hour time slots across the visible day, used for the start-time
+// picker and for snapping drag-and-drop / click-to-create to the grid.
+export const TIME_SLOTS = Array.from(
+  { length: (DAY_END_HOUR - DAY_START_HOUR) * 2 + 1 },
+  (_, i) => DAY_START_HOUR + i * 0.5
+);
+
+// Selectable durations (in hours) when creating/editing an event.
+export const DURATION_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8];
+
+export const REPEAT_OPTIONS = [
+  { value: "none", label: "Does not repeat" },
+  { value: "daily", label: "Daily" },
+];
+
 export const FONT_IMPORT_URL =
   "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap";
