@@ -22,9 +22,9 @@ function instanceFromTemplate(template) {
 // checklist tasks, repeating templates, and rescheduling — lives here.
 //
 // onItemContribution(goalId, milestoneId, delta) is called whenever an item
-// tied to a countdown milestone gets checked/unchecked, so App.jsx can
-// forward it to useGoals(). Kept as a callback so this hook doesn't need to
-// know goals exist.
+// tied to a manual-countdown milestone gets checked/unchecked, so App.jsx
+// can forward it to useGoals(). Kept as a callback so this hook doesn't
+// need to know goals exist.
 export function usePlanner({ onItemContribution } = {}) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const key = dateKey(currentDate);
@@ -39,16 +39,20 @@ export function usePlanner({ onItemContribution } = {}) {
   const events = useMemo(() => items.filter((i) => i.kind === "event"), [items]);
   const tasks = useMemo(() => items.filter((i) => i.kind === "task"), [items]);
 
-  // Every item across every date, flattened. Used to compute checklist
-  // milestone completion, which depends on subtasks that may live on
-  // different days, not just what's visible on the current day.
+  // Every item across every date, flattened. Used to compute checklist and
+  // daily-until-deadline milestone completion, which depends on subtasks
+  // that may live on different days, not just what's visible today.
   const allItems = useMemo(() => Object.values(itemsByDate).flat(), [itemsByDate]);
 
+  // Makes sure a date bucket has a fresh instance of every template whose
+  // recurrence includes that date's day of week.
   function ensureDate(k, templateList = templates) {
+    const dow = new Date(k + "T00:00:00").getDay();
     setItemsByDate((prev) => {
       const existing = prev[k] || [];
       const haveTemplateIds = new Set(existing.map((i) => i.templateId).filter(Boolean));
-      const missing = templateList.filter((t) => !haveTemplateIds.has(t.id)).map(instanceFromTemplate);
+      const due = templateList.filter((t) => t.daysOfWeek.includes(dow) && !haveTemplateIds.has(t.id));
+      const missing = due.map(instanceFromTemplate);
       if (missing.length === 0 && prev[k]) return prev;
       return { ...prev, [k]: [...existing, ...missing] };
     });
@@ -70,59 +74,49 @@ export function usePlanner({ onItemContribution } = {}) {
     setItemsByDate((prev) => ({ ...prev, [key]: updater(prev[key] || []) }));
   }
 
-  // Single entry point for both creating and saving edits, called from the
-  // item modal. `repeat` is a boolean: turning it on converts this item into
-  // a template (future days get their own fresh instance); turning it off
-  // on an already-repeating item detaches just this one.
+  // repeat: null (one-off) or { daysOfWeek: [0..6] } (recurring on those
+  // weekdays — pass all seven for "daily", a subset for "every Monday and
+  // Wednesday" etc). Single entry point for both creating and saving edits.
   function saveItem(payload, editingId) {
-    const {
-      kind, title, start, duration, goalId, milestoneId, contributionAmount, repeat,
-    } = payload;
+    const { kind, title, start, duration, goalId, milestoneId, contributionAmount, repeat } = payload;
     if (!title.trim()) return;
+    const daysOfWeek = repeat ? repeat.daysOfWeek : null;
 
     if (editingId) {
       const current = items.find((i) => i.id === editingId);
       const wasRepeating = !!current?.templateId;
+      const base = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount };
 
-      if (repeat && !wasRepeating) {
-        // Turned repeat ON: spin up a template starting from today, keep
-        // today's row but link it to the new template.
-        const template = { id: makeId("tpl"), kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount };
+      if (daysOfWeek && !wasRepeating) {
+        const template = { id: makeId("tpl"), ...base, daysOfWeek };
         setTemplates((tpls) => [...tpls, template]);
-        updateItems((its) =>
-          its.map((i) => (i.id === editingId ? { ...i, kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount, templateId: template.id } : i))
-        );
+        updateItems((its) => its.map((i) => (i.id === editingId ? { ...i, ...base, templateId: template.id } : i)));
         return;
       }
-
-      if (!repeat && wasRepeating) {
-        // Turned repeat OFF: detach from the template so future days stop
-        // generating it; this instance stays as a normal one-off item.
+      if (daysOfWeek && wasRepeating) {
+        // Repeating -> repeating: update the underlying template so future
+        // days pick up the new title/time/days-of-week too.
+        setTemplates((tpls) => tpls.map((t) => (t.id === current.templateId ? { ...t, ...base, daysOfWeek } : t)));
+        updateItems((its) => its.map((i) => (i.id === editingId ? { ...i, ...base } : i)));
+        return;
+      }
+      if (!daysOfWeek && wasRepeating) {
+        // Turned repeat off: stop future generation, keep this one instance.
         setTemplates((tpls) => tpls.filter((t) => t.id !== current.templateId));
       }
-
-      updateItems((its) =>
-        its.map((i) =>
-          i.id === editingId
-            ? { ...i, kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount, templateId: repeat ? i.templateId : null }
-            : i
-        )
-      );
+      updateItems((its) => its.map((i) => (i.id === editingId ? { ...i, ...base, templateId: daysOfWeek ? i.templateId : null } : i)));
       return;
     }
 
     // Creating new
-    if (repeat) {
-      const template = { id: makeId("tpl"), kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount };
+    const base = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount };
+    if (daysOfWeek) {
+      const template = { id: makeId("tpl"), ...base, daysOfWeek };
       setTemplates((tpls) => [...tpls, template]);
       updateItems((its) => [...its, instanceFromTemplate(template)]);
       return;
     }
-
-    updateItems((its) => [
-      ...its,
-      { id: makeId("i"), kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount, templateId: null, done: false },
-    ]);
+    updateItems((its) => [...its, { id: makeId("i"), ...base, templateId: null, done: false }]);
   }
 
   function toggleItemDone(id) {
@@ -159,6 +153,7 @@ export function usePlanner({ onItemContribution } = {}) {
     events,
     tasks,
     allItems,
+    templates,
     goToDay,
     goToToday,
     saveItem,

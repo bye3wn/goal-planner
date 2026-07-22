@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { X, Trash2, CalendarClock, ListChecks } from "lucide-react";
-import { COLORS, TIME_SLOTS, DURATION_OPTIONS, REPEAT_OPTIONS } from "../../constants/theme";
+import { COLORS, TIME_SLOTS, DURATION_OPTIONS, REPEAT_OPTIONS, WEEKDAYS, ALL_WEEKDAYS } from "../../constants/theme";
 import { formatTime, formatDuration } from "../../utils/date";
 
 const EMPTY = {
@@ -11,13 +11,13 @@ const EMPTY = {
   goalId: "",
   milestoneId: "",
   contributionAmount: "",
-  repeat: false,
+  repeatType: "none", // "none" | "daily" | "custom"
+  daysOfWeek: [],
 };
 
 // The "bigger box" — used for both creating a new item and editing an
-// existing one, so there's exactly one place that lays out title, timing,
-// goal/milestone linking, contribution, and repeat. Opened from the
-// calendar grid, the tasks panel, or by clicking an existing item.
+// existing one. Opened from the calendar grid, the tasks panel, or by
+// clicking an existing item.
 export default function ItemModal({ open, initial, goals, onSave, onDelete, onClose }) {
   const [form, setForm] = useState(EMPTY);
 
@@ -29,14 +29,26 @@ export default function ItemModal({ open, initial, goals, onSave, onDelete, onCl
 
   const selectedGoal = goals.find((g) => g.id === form.goalId);
   const selectedMilestone = selectedGoal?.milestones.find((m) => m.id === form.milestoneId);
+  const isManualCountdown = selectedMilestone?.target?.mode === "manual";
   const isEditing = !!initial?.id;
 
   function set(patch) {
     setForm((f) => ({ ...f, ...patch }));
   }
 
+  function toggleDay(day) {
+    setForm((f) => ({
+      ...f,
+      daysOfWeek: f.daysOfWeek.includes(day) ? f.daysOfWeek.filter((d) => d !== day) : [...f.daysOfWeek, day].sort(),
+    }));
+  }
+
   function submit() {
     if (!form.title.trim()) return;
+    let repeat = null;
+    if (form.repeatType === "daily") repeat = { daysOfWeek: ALL_WEEKDAYS };
+    else if (form.repeatType === "custom" && form.daysOfWeek.length > 0) repeat = { daysOfWeek: form.daysOfWeek };
+
     onSave(
       {
         kind: form.kind,
@@ -45,8 +57,8 @@ export default function ItemModal({ open, initial, goals, onSave, onDelete, onCl
         duration: form.kind === "event" ? Number(form.duration) : null,
         goalId: form.goalId || null,
         milestoneId: form.milestoneId || null,
-        contributionAmount: selectedMilestone?.target && form.contributionAmount ? Number(form.contributionAmount) : null,
-        repeat: form.repeat,
+        contributionAmount: isManualCountdown && form.contributionAmount ? Number(form.contributionAmount) : null,
+        repeat,
       },
       initial?.id
     );
@@ -54,17 +66,8 @@ export default function ItemModal({ open, initial, goals, onSave, onDelete, onCl
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(35,41,32,0.35)" }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-xl shadow-xl overflow-hidden"
-        style={{ background: COLORS.panel }}
-      >
-        {/* Header */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(35,41,32,0.35)" }} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-xl shadow-xl overflow-hidden" style={{ background: COLORS.panel }}>
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${COLORS.line}` }}>
           <span className="font-display text-lg" style={{ color: COLORS.forest }}>
             {isEditing ? "Edit item" : "New item"}
@@ -75,7 +78,6 @@ export default function ItemModal({ open, initial, goals, onSave, onDelete, onCl
         </div>
 
         <div className="px-5 py-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
-          {/* Title */}
           <input
             autoFocus
             value={form.title}
@@ -85,7 +87,6 @@ export default function ItemModal({ open, initial, goals, onSave, onDelete, onCl
             style={{ borderColor: COLORS.line }}
           />
 
-          {/* Event vs Task */}
           <div>
             <label className="text-xs font-medium block mb-1.5" style={{ color: COLORS.inkFaint }}>
               Type
@@ -116,23 +117,15 @@ export default function ItemModal({ open, initial, goals, onSave, onDelete, onCl
             </div>
           </div>
 
-          {/* Time + duration, only for events */}
           {form.kind === "event" && (
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="text-xs font-medium block mb-1.5" style={{ color: COLORS.inkFaint }}>
                   Start time
                 </label>
-                <select
-                  value={form.start}
-                  onChange={(e) => set({ start: Number(e.target.value) })}
-                  className="w-full text-sm px-3 py-2 rounded-md border outline-none"
-                  style={{ borderColor: COLORS.line }}
-                >
+                <select value={form.start} onChange={(e) => set({ start: Number(e.target.value) })} className="w-full text-sm px-3 py-2 rounded-md border outline-none" style={{ borderColor: COLORS.line }}>
                   {TIME_SLOTS.map((t) => (
-                    <option key={t} value={t}>
-                      {formatTime(t)}
-                    </option>
+                    <option key={t} value={t}>{formatTime(t)}</option>
                   ))}
                 </select>
               </div>
@@ -140,23 +133,15 @@ export default function ItemModal({ open, initial, goals, onSave, onDelete, onCl
                 <label className="text-xs font-medium block mb-1.5" style={{ color: COLORS.inkFaint }}>
                   Duration
                 </label>
-                <select
-                  value={form.duration}
-                  onChange={(e) => set({ duration: Number(e.target.value) })}
-                  className="w-full text-sm px-3 py-2 rounded-md border outline-none"
-                  style={{ borderColor: COLORS.line }}
-                >
+                <select value={form.duration} onChange={(e) => set({ duration: Number(e.target.value) })} className="w-full text-sm px-3 py-2 rounded-md border outline-none" style={{ borderColor: COLORS.line }}>
                   {DURATION_OPTIONS.map((d) => (
-                    <option key={d} value={d}>
-                      {formatDuration(d)}
-                    </option>
+                    <option key={d} value={d}>{formatDuration(d)}</option>
                   ))}
                 </select>
               </div>
             </div>
           )}
 
-          {/* Goal + milestone linking */}
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="text-xs font-medium block mb-1.5" style={{ color: COLORS.inkFaint }}>
@@ -170,9 +155,7 @@ export default function ItemModal({ open, initial, goals, onSave, onDelete, onCl
               >
                 <option value="">No goal</option>
                 {goals.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.title}
-                  </option>
+                  <option key={g.id} value={g.id}>{g.title}</option>
                 ))}
               </select>
             </div>
@@ -189,17 +172,14 @@ export default function ItemModal({ open, initial, goals, onSave, onDelete, onCl
                 >
                   <option value="">None</option>
                   {selectedGoal.milestones.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.title}
-                    </option>
+                    <option key={m.id} value={m.id}>{m.title}</option>
                   ))}
                 </select>
               </div>
             )}
           </div>
 
-          {/* Contribution, only when linked to a countdown milestone */}
-          {selectedMilestone?.target && (
+          {isManualCountdown && (
             <div className="flex items-center gap-2 text-sm px-3 py-2 rounded-md" style={{ background: COLORS.canvas }}>
               <span style={{ color: COLORS.inkFaint }}>Counts as</span>
               <input
@@ -217,42 +197,54 @@ export default function ItemModal({ open, initial, goals, onSave, onDelete, onCl
             </div>
           )}
 
-          {/* Repeat */}
+          {selectedMilestone?.target?.mode === "daily" && (
+            <p className="text-xs px-3 py-2 rounded-md" style={{ background: COLORS.canvas, color: COLORS.inkFaint }}>
+              Checking this off counts as one day toward "{selectedMilestone.title}" automatically.
+            </p>
+          )}
+
           <div>
             <label className="text-xs font-medium block mb-1.5" style={{ color: COLORS.inkFaint }}>
               Repeat
             </label>
             <select
-              value={form.repeat ? "daily" : "none"}
-              onChange={(e) => set({ repeat: e.target.value === "daily" })}
+              value={form.repeatType}
+              onChange={(e) => set({ repeatType: e.target.value, daysOfWeek: e.target.value === "custom" ? form.daysOfWeek : [] })}
               className="w-full text-sm px-3 py-2 rounded-md border outline-none"
               style={{ borderColor: COLORS.line }}
             >
               {REPEAT_OPTIONS.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
+                <option key={r.value} value={r.value}>{r.label}</option>
               ))}
             </select>
+
+            {form.repeatType === "custom" && (
+              <div className="flex gap-1.5 mt-2">
+                {WEEKDAYS.map((d) => (
+                  <button
+                    key={d.value}
+                    onClick={() => toggleDay(d.value)}
+                    className="w-8 h-8 rounded-full text-xs font-medium flex items-center justify-center"
+                    style={{
+                      border: `1px solid ${COLORS.line}`,
+                      background: form.daysOfWeek.includes(d.value) ? COLORS.forest : "transparent",
+                      color: form.daysOfWeek.includes(d.value) ? "#fff" : COLORS.ink,
+                    }}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-between px-5 py-4" style={{ borderTop: `1px solid ${COLORS.line}` }}>
           {isEditing ? (
-            <button
-              onClick={() => {
-                onDelete(initial.id);
-                onClose();
-              }}
-              className="flex items-center gap-1.5 text-sm"
-              style={{ color: COLORS.blaze }}
-            >
+            <button onClick={() => { onDelete(initial.id); onClose(); }} className="flex items-center gap-1.5 text-sm" style={{ color: COLORS.blaze }}>
               <Trash2 size={14} /> Delete
             </button>
-          ) : (
-            <span />
-          )}
+          ) : <span />}
           <div className="flex items-center gap-2">
             <button onClick={onClose} className="text-sm px-3 py-1.5 rounded-md" style={{ color: COLORS.inkFaint }}>
               Cancel

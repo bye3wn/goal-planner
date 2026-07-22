@@ -48,7 +48,21 @@ export const DURATION_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8];
 export const REPEAT_OPTIONS = [
   { value: "none", label: "Does not repeat" },
   { value: "daily", label: "Daily" },
+  { value: "custom", label: "Custom (choose days)" },
 ];
+
+// Sun=0 ... Sat=6, matching Date.prototype.getDay(). Used for the custom
+// recurrence day picker (e.g. "every Monday and Wednesday").
+export const WEEKDAYS = [
+  { value: 0, label: "S" },
+  { value: 1, label: "M" },
+  { value: 2, label: "T" },
+  { value: 3, label: "W" },
+  { value: 4, label: "T" },
+  { value: 5, label: "F" },
+  { value: 6, label: "S" },
+];
+export const ALL_WEEKDAYS = WEEKDAYS.map((d) => d.value);
 
 export const FONT_IMPORT_URL =
   "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap";

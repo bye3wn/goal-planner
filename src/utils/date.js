@@ -40,3 +40,13 @@ export function addDays(date, delta) {
   d.setDate(d.getDate() + delta);
   return d;
 }
+
+// Whole days between two dates (b - a), floor'd to ignore time-of-day.
+// Used to turn a goal deadline into "how many days total" for a
+// daily-habit-until-deadline milestone.
+export function daysBetween(a, b) {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const start = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  const end = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((end - start) / msPerDay);
+}
