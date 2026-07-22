@@ -3,8 +3,8 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { COLORS } from "../../constants/theme";
 import MilestoneList from "./MilestoneList";
 
-export default function GoalRow({ goal, isOpen, onToggle, onToggleMilestone, onAddMilestone }) {
-  const doneCount = goal.milestones.filter((m) => m.done).length;
+export default function GoalRow({ goal, isOpen, milestoneStats, onToggle, onAddMilestone }) {
+  const doneCount = goal.milestones.filter((m) => milestoneStats[m.id]?.done).length;
   const total = goal.milestones.length;
 
   return (
@@ -19,7 +19,7 @@ export default function GoalRow({ goal, isOpen, onToggle, onToggleMilestone, onA
       </button>
 
       {isOpen && (
-        <MilestoneList goal={goal} onToggleMilestone={onToggleMilestone} onAddMilestone={onAddMilestone} />
+        <MilestoneList goal={goal} milestoneStats={milestoneStats} onAddMilestone={onAddMilestone} />
       )}
     </div>
   );

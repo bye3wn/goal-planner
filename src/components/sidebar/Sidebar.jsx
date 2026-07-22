@@ -4,7 +4,7 @@ import { COLORS } from "../../constants/theme";
 import NewGoalForm from "./NewGoalForm";
 import GoalRow from "./GoalRow";
 
-export default function Sidebar({ goals, expanded, onToggleExpanded, onAddGoal, onAddMilestone, onToggleMilestone }) {
+export default function Sidebar({ goals, expanded, milestoneStats, onToggleExpanded, onAddGoal, onAddMilestone }) {
   const [addingGoal, setAddingGoal] = useState(false);
 
   return (
@@ -37,8 +37,8 @@ export default function Sidebar({ goals, expanded, onToggleExpanded, onAddGoal, 
             key={goal.id}
             goal={goal}
             isOpen={!!expanded[goal.id]}
+            milestoneStats={milestoneStats}
             onToggle={onToggleExpanded}
-            onToggleMilestone={onToggleMilestone}
             onAddMilestone={onAddMilestone}
           />
         ))}

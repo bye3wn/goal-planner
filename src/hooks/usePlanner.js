@@ -142,10 +142,16 @@ export function usePlanner({ onTaskContribution } = {}) {
     return map;
   }, [tasks]);
 
+  // Every task across every date, flattened. Used to compute checklist
+  // milestone completion (which depends on subtasks that may live on
+  // different days), not just what's visible on the current day.
+  const allTasks = useMemo(() => Object.values(tasksByDate).flat(), [tasksByDate]);
+
   return {
     currentDate,
     tasks,
     tasksByHour,
+    allTasks,
     goToDay,
     goToToday,
     addTask,
