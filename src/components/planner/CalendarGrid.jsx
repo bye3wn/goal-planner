@@ -1,30 +1,76 @@
-import React from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
-import { COLORS, HOURS, HOUR_HEIGHT_PX, DAY_START_HOUR } from "../../constants/theme";
-import { formatHour } from "../../utils/date";
+import { COLORS, HOURS, HOUR_HEIGHT_PX, DAY_START_HOUR, DAY_END_HOUR } from "../../constants/theme";
+import { formatHour, formatTime } from "../../utils/date";
+import { snapToQuarterHour, computePushLayout } from "../../utils/scheduling";
 import EventBlock from "./EventBlock";
 
-// Google Calendar-style day grid: fixed-height hourlines, events absolutely
-// positioned and sized by duration rather than one item per row. Clicking
-// empty space opens the item modal pre-filled with the clicked time;
-// clicking an event opens it for editing.
-export default function CalendarGrid({ events, goalColor, onDrop, onDragStartEvent, onSlotClick, onEventClick }) {
+// A small pixel threshold before a pointerdown-then-move counts as a drag
+// rather than a click. Below this, releasing opens the edit modal instead.
+const DRAG_THRESHOLD_PX = 4;
+
+// Google Calendar-style day grid. Dragging an event tracks the pointer
+// continuously (not native HTML5 DnD), snaps to 15-minute increments, and
+// live-previews a "push everything below out of the way" layout so you can
+// see exactly where things will land before you let go.
+export default function CalendarGrid({ events, goalColor, onRescheduleEvents, onSlotClick, onEventClick }) {
+  const gridRef = useRef(null);
   const gridHeight = HOURS.length * HOUR_HEIGHT_PX;
 
-  function handleGridClick(e) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const offsetY = e.clientY - rect.top;
-    const rawHour = DAY_START_HOUR + offsetY / HOUR_HEIGHT_PX;
-    const snapped = Math.round(rawHour * 2) / 2; // snap to nearest 30 min
-    onSlotClick(Math.max(DAY_START_HOUR, Math.min(HOURS[HOURS.length - 1], snapped)));
+  // drag: { id, duration, pointerOffsetY, startClientY, currentStart, moved }
+  const [drag, setDrag] = useState(null);
+
+  const displayEvents = useMemo(() => {
+    if (!drag) return events;
+    return computePushLayout(events, drag.id, drag.currentStart, drag.duration);
+  }, [events, drag]);
+
+  function clientYToHour(clientY) {
+    const rect = gridRef.current.getBoundingClientRect();
+    return DAY_START_HOUR + (clientY - rect.top) / HOUR_HEIGHT_PX;
   }
 
-  function handleDrop(e) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const offsetY = e.clientY - rect.top;
-    const rawHour = DAY_START_HOUR + offsetY / HOUR_HEIGHT_PX;
-    const snapped = Math.round(rawHour * 2) / 2;
-    onDrop(Math.max(DAY_START_HOUR, Math.min(HOURS[HOURS.length - 1], snapped)));
+  function handleEventPointerDown(e, event, blockTopPx) {
+    const rect = gridRef.current.getBoundingClientRect();
+    const pointerOffsetY = e.clientY - rect.top - blockTopPx;
+    gridRef.current.setPointerCapture(e.pointerId);
+    setDrag({
+      id: event.id,
+      pointerId: e.pointerId,
+      duration: event.duration,
+      pointerOffsetY,
+      startClientY: e.clientY,
+      currentStart: event.start,
+      moved: false,
+    });
+  }
+
+  function handlePointerMove(e) {
+    if (!drag) return;
+    const movedPx = Math.abs(e.clientY - drag.startClientY);
+    const rect = gridRef.current.getBoundingClientRect();
+    const topPx = e.clientY - rect.top - drag.pointerOffsetY;
+    const rawHour = DAY_START_HOUR + topPx / HOUR_HEIGHT_PX;
+    const snapped = Math.max(DAY_START_HOUR, Math.min(DAY_END_HOUR - 0.25, snapToQuarterHour(rawHour)));
+    setDrag((d) => (d ? { ...d, currentStart: snapped, moved: d.moved || movedPx > DRAG_THRESHOLD_PX } : d));
+  }
+
+  function handlePointerUp() {
+    if (!drag) return;
+    gridRef.current?.releasePointerCapture(drag.pointerId);
+    if (drag.moved) {
+      onRescheduleEvents(computePushLayout(events, drag.id, drag.currentStart, drag.duration));
+    } else {
+      const original = events.find((ev) => ev.id === drag.id);
+      if (original) onEventClick(original);
+    }
+    setDrag(null);
+  }
+
+  function handleGridClick(e) {
+    if (drag) return; // a drag's pointerup already handled this
+    const snapped = Math.max(DAY_START_HOUR, Math.min(DAY_END_HOUR, snapToQuarterHour(clientYToHour(e.clientY))));
+    onSlotClick(snapped);
   }
 
   return (
@@ -41,11 +87,12 @@ export default function CalendarGrid({ events, goalColor, onDrop, onDragStartEve
 
         {/* Grid + events */}
         <div
+          ref={gridRef}
           className="relative flex-1 cursor-pointer"
           style={{ height: gridHeight }}
           onClick={handleGridClick}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
         >
           {HOURS.map((h, idx) => (
             <div
@@ -53,30 +100,34 @@ export default function CalendarGrid({ events, goalColor, onDrop, onDragStartEve
               className="absolute left-0 right-0 flex items-start justify-end group"
               style={{ top: idx * HOUR_HEIGHT_PX, height: HOUR_HEIGHT_PX, borderTop: `1px solid ${COLORS.line}` }}
             >
-              <Plus
-                size={13}
-                color={COLORS.inkFaint}
-                className="opacity-0 group-hover:opacity-100 transition-opacity mt-1 mr-1"
-              />
+              <Plus size={13} color={COLORS.inkFaint} className="opacity-0 group-hover:opacity-100 transition-opacity mt-1 mr-1" />
             </div>
           ))}
 
-          {events.map((ev) => (
+          {displayEvents.map((ev) => (
             <EventBlock
               key={ev.id}
               event={ev}
               color={goalColor(ev.goalId)}
               dayStartHour={DAY_START_HOUR}
-              onDragStart={(e) => {
-                e.stopPropagation();
-                onDragStartEvent(ev.id);
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onEventClick(ev);
-              }}
+              isDragging={drag?.id === ev.id}
+              onPointerDownEvent={handleEventPointerDown}
             />
           ))}
+
+          {/* Live time readout while dragging, so it's clear exactly where it'll land */}
+          {drag && (
+            <div
+              className="absolute right-2 font-mono text-[11px] px-2 py-0.5 rounded pointer-events-none"
+              style={{
+                top: (drag.currentStart - DAY_START_HOUR) * HOUR_HEIGHT_PX - 20,
+                background: COLORS.forest,
+                color: "#fff",
+              }}
+            >
+              {formatTime(drag.currentStart)}
+            </div>
+          )}
         </div>
       </div>
     </div>

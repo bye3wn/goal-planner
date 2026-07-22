@@ -43,8 +43,7 @@ export default function App() {
     saveItem,
     toggleItemDone,
     deleteItem,
-    setDraggedId,
-    handleDrop,
+    rescheduleEvents,
   } = usePlanner({ onItemContribution: addMilestoneProgress });
 
   const [itemModal, setItemModal] = useState(null); // null | { initial }
@@ -145,8 +144,7 @@ export default function App() {
         <CalendarGrid
           events={events}
           goalColor={goalColor}
-          onDrop={handleDrop}
-          onDragStartEvent={setDraggedId}
+          onRescheduleEvents={rescheduleEvents}
           onSlotClick={openCreateEvent}
           onEventClick={openEditItem}
         />

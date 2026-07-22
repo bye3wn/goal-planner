@@ -38,8 +38,8 @@ export const HOUR_HEIGHT_PX = 60;
 // Half-hour time slots across the visible day, used for the start-time
 // picker and for snapping drag-and-drop / click-to-create to the grid.
 export const TIME_SLOTS = Array.from(
-  { length: (DAY_END_HOUR - DAY_START_HOUR) * 2 + 1 },
-  (_, i) => DAY_START_HOUR + i * 0.5
+  { length: (DAY_END_HOUR - DAY_START_HOUR) * 4 + 1 },
+  (_, i) => DAY_START_HOUR + i * 0.25
 );
 
 // Selectable durations (in hours) when creating/editing an event.

@@ -33,7 +33,6 @@ export function usePlanner({ onItemContribution } = {}) {
   const [itemsByDate, setItemsByDate] = useState(() => ({
     [key]: [...seedItemsFor(key), ...seedTemplates.map(instanceFromTemplate)],
   }));
-  const [draggedId, setDraggedId] = useState(null);
 
   const items = itemsByDate[key] || [];
   const events = useMemo(() => items.filter((i) => i.kind === "event"), [items]);
@@ -138,14 +137,12 @@ export function usePlanner({ onItemContribution } = {}) {
     }
   }
 
-  function rescheduleEvent(id, newStart) {
-    updateItems((its) => its.map((i) => (i.id === id ? { ...i, start: newStart } : i)));
-  }
-
-  function handleDrop(newStart) {
-    if (!draggedId) return;
-    rescheduleEvent(draggedId, newStart);
-    setDraggedId(null);
+  // Applies a full set of {id, start} changes at once — used by the
+  // calendar drag interaction, since moving one event can push several
+  // others to new times in the same drop.
+  function rescheduleEvents(updatedEvents) {
+    const startById = new Map(updatedEvents.map((e) => [e.id, e.start]));
+    updateItems((its) => its.map((i) => (startById.has(i.id) ? { ...i, start: startById.get(i.id) } : i)));
   }
 
   return {
@@ -159,8 +156,6 @@ export function usePlanner({ onItemContribution } = {}) {
     saveItem,
     toggleItemDone,
     deleteItem,
-    draggedId,
-    setDraggedId,
-    handleDrop,
+    rescheduleEvents,
   };
 }
