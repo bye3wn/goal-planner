@@ -20,6 +20,14 @@ export default function CalendarGrid({ events, goalColor, onRescheduleEvents, on
   // drag: { id, duration, pointerOffsetY, startClientY, currentStart, moved }
   const [drag, setDrag] = useState(null);
 
+  // The browser fires a native "click" right after pointerup, even when
+  // that pointerup ended a drag — and by then `drag` state has already
+  // reset to null, so checking `drag` alone doesn't block it. This ref
+  // survives that timing gap and suppresses exactly one click after a
+  // real drag, which is what was causing a drop to occasionally pop open
+  // "create new event" right after.
+  const suppressNextClickRef = useRef(false);
+
   const displayEvents = useMemo(() => {
     if (!drag) return events;
     return computePushLayout(events, drag.id, drag.currentStart, drag.duration);
@@ -60,6 +68,7 @@ export default function CalendarGrid({ events, goalColor, onRescheduleEvents, on
     gridRef.current?.releasePointerCapture(drag.pointerId);
     if (drag.moved) {
       onRescheduleEvents(computePushLayout(events, drag.id, drag.currentStart, drag.duration));
+      suppressNextClickRef.current = true;
     } else {
       const original = events.find((ev) => ev.id === drag.id);
       if (original) onEventClick(original);
@@ -68,6 +77,10 @@ export default function CalendarGrid({ events, goalColor, onRescheduleEvents, on
   }
 
   function handleGridClick(e) {
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false;
+      return;
+    }
     if (drag) return; // a drag's pointerup already handled this
     const snapped = Math.max(DAY_START_HOUR, Math.min(DAY_END_HOUR, snapToQuarterHour(clientYToHour(e.clientY))));
     onSlotClick(snapped);

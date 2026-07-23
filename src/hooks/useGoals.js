@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { seedGoals } from "../data/seed";
 import { makeId } from "../utils/id";
-import { daysBetween } from "../utils/date";
+import { dateKey } from "../utils/date";
 
 // Everything to do with goals and their milestones lives here. Components
 // never mutate goal state directly — they call these functions.
@@ -14,9 +14,11 @@ import { daysBetween } from "../utils/date";
 //     addMilestoneProgress, called when a task with a custom contribution
 //     amount is checked/unchecked.
 //   - "daily until deadline" milestones (target.mode === "daily") complete
-//     via how many linked tasks are done, computed in App.jsx — the target
-//     amount is fixed at creation time (days between today and the goal's
-//     deadline).
+//     via how many linked tasks are done, computed in App.jsx — the
+//     denominator is NOT stored as a fixed number. Instead we store the
+//     startDate the habit began, and recompute days-until-deadline live
+//     from the goal's CURRENT deadline every time it's read — so editing
+//     the goal's deadline immediately updates the percentage everywhere.
 export function useGoals() {
   const [goals, setGoals] = useState(seedGoals);
   const [expanded, setExpanded] = useState({ g1: true, g2: true, g3: true });
@@ -50,16 +52,19 @@ export function useGoals() {
   // mode: "checklist" | "manual" | "daily"
   //   checklist -> target null
   //   manual    -> target { mode: "manual", amount, unit }
-  //   daily     -> target { mode: "daily", amount: days-until-goal-deadline, unit: "days" }
-  //                (requires the goal to have a deadline)
-  function buildTarget(goal, mode, amount, unit) {
+  //   daily     -> target { mode: "daily", startDate, unit: "days" }
+  //                (requires the goal to have a deadline; startDate is set
+  //                once, the first time this milestone becomes "daily", and
+  //                kept stable on later edits so the denominator only moves
+  //                because the deadline changed, not because you re-saved)
+  function buildTarget(goal, mode, amount, unit, existing) {
     if (mode === "manual") {
       const n = Number(amount);
       return n > 0 ? { mode: "manual", amount: n, unit: (unit || "").trim() || "done" } : null;
     }
     if (mode === "daily" && goal?.deadline) {
-      const days = Math.max(1, daysBetween(new Date(), new Date(goal.deadline)));
-      return { mode: "daily", amount: days, unit: "days" };
+      const startDate = existing?.target?.mode === "daily" ? existing.target.startDate : dateKey(new Date());
+      return { mode: "daily", startDate, unit: "days" };
     }
     return null;
   }
@@ -69,7 +74,7 @@ export function useGoals() {
     setGoals((gs) =>
       gs.map((g) =>
         g.id === goalId
-          ? { ...g, milestones: [...g.milestones, { id: makeId("m"), title: title.trim(), target: buildTarget(g, mode, amount, unit), progress: 0 }] }
+          ? { ...g, milestones: [...g.milestones, { id: makeId("m"), title: title.trim(), target: buildTarget(g, mode, amount, unit, null), progress: 0 }] }
           : g
       )
     );
@@ -83,7 +88,7 @@ export function useGoals() {
               ...g,
               milestones: g.milestones.map((m) =>
                 m.id === milestoneId
-                  ? { ...m, title: title.trim(), target: buildTarget(g, mode, amount, unit), progress: mode === "manual" ? m.progress : 0 }
+                  ? { ...m, title: title.trim(), target: buildTarget(g, mode, amount, unit, m), progress: mode === "manual" ? m.progress : 0 }
                   : m
               ),
             }

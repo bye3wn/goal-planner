@@ -45,8 +45,9 @@ export const seedGoals = [
       { id: "m6", title: "Gain 5 lbs this month", target: null, progress: 0 },
       // Daily-habit-until-deadline: progress isn't stored here — it's
       // derived each render from how many linked daily tasks are checked
-      // off (see App.jsx). amount is the day-count at creation time.
-      { id: "m7", title: "Hit 3000 calories every day", target: { mode: "daily", amount: 184, unit: "days" }, progress: 0 },
+      // off, against days-between-startDate-and-the-goal's-CURRENT-deadline
+      // (see App.jsx). Changing the goal's deadline updates this live.
+      { id: "m7", title: "Hit 3000 calories every day", target: { mode: "daily", startDate: "2026-07-22", unit: "days" }, progress: 0 },
     ],
   },
 ];

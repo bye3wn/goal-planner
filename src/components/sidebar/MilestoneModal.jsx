@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { X, Trash2 } from "lucide-react";
 import { COLORS } from "../../constants/theme";
-import { daysBetween } from "../../utils/date";
+import { daysBetween, dateKey } from "../../utils/date";
 
 const EMPTY = { title: "", mode: "checklist", amount: "", unit: "" };
 
@@ -33,7 +33,8 @@ export default function MilestoneModal({ open, goal, initial, onSave, onDelete, 
   if (!open) return null;
 
   const isEditing = !!initial?.id;
-  const daysUntilDeadline = goal?.deadline ? Math.max(1, daysBetween(new Date(), new Date(goal.deadline))) : null;
+  const anchorDate = initial?.target?.mode === "daily" ? initial.target.startDate : dateKey(new Date());
+  const daysUntilDeadline = goal?.deadline ? Math.max(1, daysBetween(new Date(anchorDate), new Date(goal.deadline))) : null;
 
   function set(patch) {
     setForm((f) => ({ ...f, ...patch }));
@@ -117,7 +118,8 @@ export default function MilestoneModal({ open, goal, initial, onSave, onDelete, 
 
           {form.mode === "daily" && goal?.deadline && (
             <p className="text-xs px-3 py-2 rounded-md" style={{ background: COLORS.canvas, color: COLORS.inkFaint }}>
-              {daysUntilDeadline} days until this goal's deadline — that's the denominator for this milestone's percentage.
+              {daysUntilDeadline} days until this goal's deadline — that's the denominator for this milestone's
+              percentage. It updates automatically if you change the goal's deadline later.
             </p>
           )}
         </div>

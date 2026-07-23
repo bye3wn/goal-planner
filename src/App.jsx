@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { COLORS, FONT_IMPORT_URL } from "./constants/theme";
+import { daysBetween } from "./utils/date";
 import { useGoals } from "./hooks/useGoals";
 import { usePlanner } from "./hooks/usePlanner";
 import Header from "./components/Header";
@@ -74,8 +75,15 @@ export default function App() {
         } else if (m.target.mode === "daily") {
           const linked = allItems.filter((i) => i.milestoneId === m.id);
           const doneCount = linked.filter((i) => i.done).length;
-          const pct = Math.min(100, Math.round((doneCount / m.target.amount) * 100));
-          map[m.id] = { done: doneCount >= m.target.amount, label: `${doneCount}/${m.target.amount} days (${pct}%)` };
+          if (!g.deadline) {
+            // Deadline got removed after this milestone was set to "daily" —
+            // no denominator to show a percentage against.
+            map[m.id] = { done: false, label: `${doneCount} days done (no deadline set)` };
+          } else {
+            const totalDays = Math.max(1, daysBetween(new Date(m.target.startDate), new Date(g.deadline)));
+            const pct = Math.min(100, Math.round((doneCount / totalDays) * 100));
+            map[m.id] = { done: doneCount >= totalDays, label: `${doneCount}/${totalDays} days (${pct}%)` };
+          }
         }
       }
     }
