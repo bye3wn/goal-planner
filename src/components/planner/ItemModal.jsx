@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { X, Trash2, CalendarClock, ListChecks, Circle, CheckCircle2 } from "lucide-react";
+import { X, Trash2, CalendarClock, ListChecks, Circle, CheckCircle2, ChevronDown } from "lucide-react";
 import { COLORS, TIME_SLOTS, DURATION_OPTIONS, REPEAT_OPTIONS, WEEKDAYS, ALL_WEEKDAYS } from "../../constants/theme";
 import { formatTime, formatDuration } from "../../utils/date";
 
@@ -26,9 +26,13 @@ const EMPTY = {
 // check them off from here directly, same as the tasks panel.
 export default function ItemModal({ open, initial, goals, dayTasks, onToggleTaskDone, onSave, onDelete, onClose }) {
   const [form, setForm] = useState(EMPTY);
+  const [showTitleDropdown, setShowTitleDropdown] = useState(false);
 
   useEffect(() => {
-    if (open) setForm({ ...EMPTY, ...initial, linkedTaskIds: initial?.linkedTaskIds || [] });
+    if (open) {
+      setForm({ ...EMPTY, ...initial, linkedTaskIds: initial?.linkedTaskIds || [] });
+      setShowTitleDropdown(false);
+    }
   }, [open, initial]);
 
   if (!open) return null;
@@ -91,15 +95,54 @@ export default function ItemModal({ open, initial, goals, dayTasks, onToggleTask
           </button>
         </div>
 
-        <div className="px-5 py-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
-          <input
-            autoFocus
-            value={form.title}
-            onChange={(e) => set({ title: e.target.value })}
-            placeholder="Title"
-            className="text-base px-3 py-2 rounded-md border outline-none"
-            style={{ borderColor: COLORS.line }}
-          />
+        <div className="px-5 py-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto" onClick={() => showTitleDropdown && setShowTitleDropdown(false)}>
+          <div className="relative">
+            <div className="flex items-center gap-1.5">
+              <input
+                autoFocus
+                value={form.title}
+                onChange={(e) => set({ title: e.target.value })}
+                placeholder="Title"
+                className="flex-1 text-base px-3 py-2 rounded-md border outline-none"
+                style={{ borderColor: COLORS.line }}
+              />
+              {goals.length > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowTitleDropdown((o) => !o);
+                  }}
+                  className="p-2 rounded-md border flex-shrink-0"
+                  style={{ borderColor: COLORS.line }}
+                  title="Use a goal's name"
+                >
+                  <ChevronDown size={16} color={COLORS.inkFaint} />
+                </button>
+              )}
+            </div>
+            {showTitleDropdown && (
+              <div
+                className="absolute z-10 mt-1 left-0 right-0 rounded-md border shadow-lg overflow-hidden"
+                style={{ background: COLORS.panel, borderColor: COLORS.line }}
+              >
+                {goals.map((g) => (
+                  <button
+                    key={g.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      set({ title: g.title });
+                      setShowTitleDropdown(false);
+                    }}
+                    className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-black/5"
+                  >
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: g.color }} />
+                    {g.title}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div>
             <label className="text-xs font-medium block mb-1.5" style={{ color: COLORS.inkFaint }}>
