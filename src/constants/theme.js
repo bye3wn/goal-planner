@@ -22,23 +22,25 @@ export const GOAL_PALETTE = [
   { name: "Slate", hex: "#3E5C76" },
 ];
 
-// The visible hours in the day planner. Change start/end to widen the day.
-export const DAY_START_HOUR = 6; // 6am
-export const DAY_END_HOUR = 22; // 10pm
+// The visible hours in the day planner — now the full day. Day view
+// auto-scrolls to a sensible starting point (see CalendarGrid) so you're
+// not dropped at midnight every time.
+export const DAY_START_HOUR = 0;
+export const DAY_END_HOUR = 24;
 export const HOURS = Array.from(
-  { length: DAY_END_HOUR - DAY_START_HOUR + 1 },
+  { length: DAY_END_HOUR - DAY_START_HOUR },
   (_, i) => i + DAY_START_HOUR
 );
 
 // Pixel height of one hour in the calendar grid. Event block height is
 // duration (in hours) * this value, so blocks are visually proportional to
 // how long the event actually takes — same idea as Google Calendar.
-export const HOUR_HEIGHT_PX = 60;
+export const HOUR_HEIGHT_PX = 52;
 
 // Half-hour time slots across the visible day, used for the start-time
 // picker and for snapping drag-and-drop / click-to-create to the grid.
 export const TIME_SLOTS = Array.from(
-  { length: (DAY_END_HOUR - DAY_START_HOUR) * 4 + 1 },
+  { length: (DAY_END_HOUR - DAY_START_HOUR) * 4 },
   (_, i) => DAY_START_HOUR + i * 0.25
 );
 
@@ -63,6 +65,15 @@ export const WEEKDAYS = [
   { value: 6, label: "S" },
 ];
 export const ALL_WEEKDAYS = WEEKDAYS.map((d) => d.value);
+
+export const WEEKDAY_FULL = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+export const MONTH_LABELS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+// The four calendar views, in the order they appear in the view switcher.
+export const CALENDAR_VIEWS = ["day", "week", "month", "year"];
 
 export const FONT_IMPORT_URL =
   "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap";

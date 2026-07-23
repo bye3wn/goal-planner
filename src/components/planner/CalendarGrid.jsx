@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { COLORS, HOURS, HOUR_HEIGHT_PX, DAY_START_HOUR, DAY_END_HOUR } from "../../constants/theme";
 import { formatHour, formatTime } from "../../utils/date";
@@ -9,13 +9,22 @@ import EventBlock from "./EventBlock";
 // rather than a click. Below this, releasing opens the edit modal instead.
 const DRAG_THRESHOLD_PX = 4;
 
+// The day now spans all 24 hours, so on first render we scroll to a
+// reasonable starting point instead of dropping you at midnight.
+const DEFAULT_SCROLL_HOUR = 7;
+
 // Google Calendar-style day grid. Dragging an event tracks the pointer
 // continuously (not native HTML5 DnD), snaps to 15-minute increments, and
 // live-previews a "push everything below out of the way" layout so you can
 // see exactly where things will land before you let go.
 export default function CalendarGrid({ events, dayTasks, goalColor, onRescheduleEvents, onSlotClick, onEventClick }) {
   const gridRef = useRef(null);
+  const scrollRef = useRef(null);
   const gridHeight = HOURS.length * HOUR_HEIGHT_PX;
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = DEFAULT_SCROLL_HOUR * HOUR_HEIGHT_PX;
+  }, []);
 
   // drag: { id, duration, pointerOffsetY, startClientY, currentStart, moved }
   const [drag, setDrag] = useState(null);
@@ -82,12 +91,12 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
       return;
     }
     if (drag) return; // a drag's pointerup already handled this
-    const snapped = Math.max(DAY_START_HOUR, Math.min(DAY_END_HOUR, snapToQuarterHour(clientYToHour(e.clientY))));
+    const snapped = Math.max(DAY_START_HOUR, Math.min(DAY_END_HOUR - 0.25, snapToQuarterHour(clientYToHour(e.clientY))));
     onSlotClick(snapped);
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-6 py-5">
+    <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-5">
       <div className="max-w-2xl flex">
         {/* Hour labels */}
         <div className="w-16 flex-shrink-0" style={{ height: gridHeight }}>

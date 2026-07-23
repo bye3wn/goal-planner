@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { seedItemsFor, seedTemplates } from "../data/seed";
-import { dateKey, addDays } from "../utils/date";
+import { dateKey } from "../utils/date";
+import { getViewDateKeys, shiftByView } from "../utils/calendarRange";
 import { makeId } from "../utils/id";
 
 function instanceFromTemplate(template) {
@@ -22,14 +23,22 @@ function instanceFromTemplate(template) {
   };
 }
 
-// Everything to do with the day planner — current date, calendar events,
-// checklist tasks, repeating templates, and rescheduling — lives here.
+// Everything to do with the planner — the current view (day/week/month/
+// year), calendar events, checklist tasks, repeating templates, and
+// rescheduling — lives here.
+//
+// Items are stored per calendar date (itemsByDate), same as before — but
+// now that week/month/year views show many dates at once, most operations
+// (toggle/delete/save) need to find which date an item lives on rather
+// than assuming "today", so they search across itemsByDate instead of
+// only touching the currently-focused day.
 //
 // onItemContribution(goalId, milestoneId, delta) is called whenever an item
 // tied to a manual-countdown milestone gets checked/unchecked, so App.jsx
 // can forward it to useGoals(). Kept as a callback so this hook doesn't
 // need to know goals exist.
 export function usePlanner({ onItemContribution } = {}) {
+  const [view, setView] = useState("day"); // "day" | "week" | "month" | "year"
   const [currentDate, setCurrentDate] = useState(new Date());
   const key = dateKey(currentDate);
 
@@ -42,78 +51,102 @@ export function usePlanner({ onItemContribution } = {}) {
   const events = useMemo(() => items.filter((i) => i.kind === "event"), [items]);
   const tasks = useMemo(() => items.filter((i) => i.kind === "task"), [items]);
 
-  // Every item across every date, flattened. Used to compute checklist and
-  // daily-until-deadline milestone completion, which depends on subtasks
-  // that may live on different days, not just what's visible today.
-  const allItems = useMemo(() => Object.values(itemsByDate).flat(), [itemsByDate]);
+  // Every item across every date, each tagged with its date key. Used for
+  // milestone-completion math, week/month/year rendering, and the
+  // range-aware tasks panel.
+  const allItems = useMemo(
+    () => Object.entries(itemsByDate).flatMap(([date, arr]) => arr.map((i) => ({ ...i, date }))),
+    [itemsByDate]
+  );
 
-  // Makes sure a date bucket has a fresh instance of every template whose
-  // recurrence includes that date's day of week.
-  function ensureDate(k, templateList = templates) {
-    const dow = new Date(k + "T00:00:00").getDay();
+  // Makes sure every date key in `keys` has a fresh instance of every
+  // template whose recurrence includes that date's day of week. Batches
+  // everything into one state update regardless of how many dates (so
+  // switching to year view doesn't cause 365 separate re-renders).
+  function ensureDateRange(keys) {
     setItemsByDate((prev) => {
-      const existing = prev[k] || [];
-      const haveTemplateIds = new Set(existing.map((i) => i.templateId).filter(Boolean));
-      const due = templateList.filter((t) => t.daysOfWeek.includes(dow) && !haveTemplateIds.has(t.id));
-      const missing = due.map(instanceFromTemplate);
-      if (missing.length === 0 && prev[k]) return prev;
-      return { ...prev, [k]: [...existing, ...missing] };
+      let changed = false;
+      const next = { ...prev };
+      for (const k of keys) {
+        const existing = next[k];
+        const dow = new Date(k + "T00:00:00").getDay();
+        const haveTemplateIds = new Set((existing || []).map((i) => i.templateId).filter(Boolean));
+        const due = templates.filter((t) => t.daysOfWeek.includes(dow) && !haveTemplateIds.has(t.id));
+        if (due.length > 0 || !existing) {
+          next[k] = [...(existing || []), ...due.map(instanceFromTemplate)];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
     });
   }
 
-  function goToDay(delta) {
-    const next = addDays(currentDate, delta);
-    setCurrentDate(next);
-    ensureDate(dateKey(next));
-  }
+  // Whenever the visible date or view changes, make sure every date it
+  // covers has its repeating items generated.
+  useEffect(() => {
+    ensureDateRange(getViewDateKeys(currentDate, view));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDate, view, templates]);
 
+  function goToNext() {
+    setCurrentDate((d) => shiftByView(d, view, 1));
+  }
+  function goToPrev() {
+    setCurrentDate((d) => shiftByView(d, view, -1));
+  }
   function goToToday() {
-    const next = new Date();
-    setCurrentDate(next);
-    ensureDate(dateKey(next));
+    setCurrentDate(new Date());
+  }
+  function jumpToDate(date, nextView) {
+    setCurrentDate(date);
+    if (nextView) setView(nextView);
   }
 
-  function updateItems(updater) {
-    setItemsByDate((prev) => ({ ...prev, [key]: updater(prev[key] || []) }));
+  function findDateKeyOf(id) {
+    for (const [dk, arr] of Object.entries(itemsByDate)) {
+      if (arr.some((i) => i.id === id)) return dk;
+    }
+    return null;
+  }
+
+  function updateItemsAt(dateKeyStr, updater) {
+    setItemsByDate((prev) => ({ ...prev, [dateKeyStr]: updater(prev[dateKeyStr] || []) }));
   }
 
   // repeat: null (one-off) or { daysOfWeek: [0..6] } (recurring on those
   // weekdays — pass all seven for "daily", a subset for "every Monday and
-  // Wednesday" etc). linkedTaskIds is only meaningful for events — the
-  // day's tasks you want visible/checkable while that event is happening.
-  // Single entry point for both creating and saving edits.
-  function saveItem(payload, editingId) {
+  // Wednesday" etc). linkedTaskIds is only meaningful for events.
+  // targetDateKey is which day a NEW item is created on (ignored when
+  // editing — edits stay on the item's existing date).
+  function saveItem(payload, editingId, targetDateKey = key) {
     const { kind, title, start, duration, goalId, milestoneId, contributionAmount, repeat, linkedTaskIds } = payload;
     if (!title.trim()) return;
     const daysOfWeek = repeat ? repeat.daysOfWeek : null;
     const linked = kind === "event" ? linkedTaskIds || [] : undefined;
 
     if (editingId) {
-      const current = items.find((i) => i.id === editingId);
+      const dk = findDateKeyOf(editingId);
+      if (!dk) return;
+      const current = itemsByDate[dk].find((i) => i.id === editingId);
       const wasRepeating = !!current?.templateId;
       const base = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount, linkedTaskIds: linked };
-      // Templates never store linkedTaskIds (see instanceFromTemplate) —
-      // strip it before saving one so it doesn't leak into future days.
       const templateBase = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount };
 
       if (daysOfWeek && !wasRepeating) {
         const template = { id: makeId("tpl"), ...templateBase, daysOfWeek };
         setTemplates((tpls) => [...tpls, template]);
-        updateItems((its) => its.map((i) => (i.id === editingId ? { ...i, ...base, templateId: template.id } : i)));
+        updateItemsAt(dk, (its) => its.map((i) => (i.id === editingId ? { ...i, ...base, templateId: template.id } : i)));
         return;
       }
       if (daysOfWeek && wasRepeating) {
-        // Repeating -> repeating: update the underlying template so future
-        // days pick up the new title/time/days-of-week too.
         setTemplates((tpls) => tpls.map((t) => (t.id === current.templateId ? { ...t, ...templateBase, daysOfWeek } : t)));
-        updateItems((its) => its.map((i) => (i.id === editingId ? { ...i, ...base } : i)));
+        updateItemsAt(dk, (its) => its.map((i) => (i.id === editingId ? { ...i, ...base } : i)));
         return;
       }
       if (!daysOfWeek && wasRepeating) {
-        // Turned repeat off: stop future generation, keep this one instance.
         setTemplates((tpls) => tpls.filter((t) => t.id !== current.templateId));
       }
-      updateItems((its) => its.map((i) => (i.id === editingId ? { ...i, ...base, templateId: daysOfWeek ? i.templateId : null } : i)));
+      updateItemsAt(dk, (its) => its.map((i) => (i.id === editingId ? { ...i, ...base, templateId: daysOfWeek ? i.templateId : null } : i)));
       return;
     }
 
@@ -122,17 +155,19 @@ export function usePlanner({ onItemContribution } = {}) {
     if (daysOfWeek) {
       const template = { id: makeId("tpl"), ...base, daysOfWeek };
       setTemplates((tpls) => [...tpls, template]);
-      updateItems((its) => [...its, instanceFromTemplate(template)]);
+      updateItemsAt(targetDateKey, (its) => [...its, instanceFromTemplate(template)]);
       return;
     }
-    updateItems((its) => [...its, { id: makeId("i"), ...base, linkedTaskIds: linked, templateId: null, done: false }]);
+    updateItemsAt(targetDateKey, (its) => [...its, { id: makeId("i"), ...base, linkedTaskIds: linked, templateId: null, done: false }]);
   }
 
   function toggleItemDone(id) {
-    const item = items.find((i) => i.id === id);
+    const dk = findDateKeyOf(id);
+    if (!dk) return;
+    const item = itemsByDate[dk].find((i) => i.id === id);
     if (!item) return;
     const willBeDone = !item.done;
-    updateItems((its) => its.map((i) => (i.id === id ? { ...i, done: willBeDone } : i)));
+    updateItemsAt(dk, (its) => its.map((i) => (i.id === id ? { ...i, done: willBeDone } : i)));
 
     if (item.contributionAmount && item.milestoneId && onItemContribution) {
       onItemContribution(item.goalId, item.milestoneId, willBeDone ? item.contributionAmount : -item.contributionAmount);
@@ -140,33 +175,43 @@ export function usePlanner({ onItemContribution } = {}) {
   }
 
   function deleteItem(id) {
-    const item = items.find((i) => i.id === id);
-    updateItems((its) =>
-      its
-        .filter((i) => i.id !== id)
-        .map((i) => (i.linkedTaskIds?.includes(id) ? { ...i, linkedTaskIds: i.linkedTaskIds.filter((tid) => tid !== id) } : i))
-    );
+    const dk = findDateKeyOf(id);
+    const item = dk ? itemsByDate[dk].find((i) => i.id === id) : null;
+    setItemsByDate((prev) => {
+      const next = {};
+      for (const [k, arr] of Object.entries(prev)) {
+        next[k] = arr
+          .filter((i) => i.id !== id)
+          .map((i) => (i.linkedTaskIds?.includes(id) ? { ...i, linkedTaskIds: i.linkedTaskIds.filter((tid) => tid !== id) } : i));
+      }
+      return next;
+    });
     if (item?.templateId) {
       setTemplates((tpls) => tpls.filter((t) => t.id !== item.templateId));
     }
   }
 
-  // Applies a full set of {id, start} changes at once — used by the
-  // calendar drag interaction, since moving one event can push several
-  // others to new times in the same drop.
-  function rescheduleEvents(updatedEvents) {
+  // Applies a full set of {id, start} changes at once, all on the same
+  // date — used by the day-view drag interaction, since moving one event
+  // can push several others to new times in the same drop. Drag-and-drop
+  // only happens within a single day's grid, so this stays day-scoped.
+  function rescheduleEvents(updatedEvents, dateKeyStr = key) {
     const startById = new Map(updatedEvents.map((e) => [e.id, e.start]));
-    updateItems((its) => its.map((i) => (startById.has(i.id) ? { ...i, start: startById.get(i.id) } : i)));
+    updateItemsAt(dateKeyStr, (its) => its.map((i) => (startById.has(i.id) ? { ...i, start: startById.get(i.id) } : i)));
   }
 
   return {
+    view,
+    setView,
     currentDate,
     events,
     tasks,
     allItems,
     templates,
-    goToDay,
+    goToNext,
+    goToPrev,
     goToToday,
+    jumpToDate,
     saveItem,
     toggleItemDone,
     deleteItem,
