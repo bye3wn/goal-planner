@@ -131,7 +131,7 @@ export default function ItemModal({ open, initial, goals, dayTasks, onToggleTask
                     key={g.id}
                     onClick={(e) => {
                       e.stopPropagation();
-                      set({ title: g.title });
+                      set({ title: g.title, goalId: g.id, milestoneId: "", contributionAmount: "" });
                       setShowTitleDropdown(false);
                     }}
                     className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-black/5"
