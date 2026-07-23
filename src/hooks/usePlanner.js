@@ -15,6 +15,10 @@ function instanceFromTemplate(template) {
     contributionAmount: template.contributionAmount,
     templateId: template.id,
     done: false,
+    // Which day's tasks to complete during this event — a fresh empty list
+    // each day, since which tasks exist that day is different every time a
+    // repeating event regenerates.
+    linkedTaskIds: template.kind === "event" ? [] : undefined,
   };
 }
 
@@ -75,19 +79,25 @@ export function usePlanner({ onItemContribution } = {}) {
 
   // repeat: null (one-off) or { daysOfWeek: [0..6] } (recurring on those
   // weekdays — pass all seven for "daily", a subset for "every Monday and
-  // Wednesday" etc). Single entry point for both creating and saving edits.
+  // Wednesday" etc). linkedTaskIds is only meaningful for events — the
+  // day's tasks you want visible/checkable while that event is happening.
+  // Single entry point for both creating and saving edits.
   function saveItem(payload, editingId) {
-    const { kind, title, start, duration, goalId, milestoneId, contributionAmount, repeat } = payload;
+    const { kind, title, start, duration, goalId, milestoneId, contributionAmount, repeat, linkedTaskIds } = payload;
     if (!title.trim()) return;
     const daysOfWeek = repeat ? repeat.daysOfWeek : null;
+    const linked = kind === "event" ? linkedTaskIds || [] : undefined;
 
     if (editingId) {
       const current = items.find((i) => i.id === editingId);
       const wasRepeating = !!current?.templateId;
-      const base = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount };
+      const base = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount, linkedTaskIds: linked };
+      // Templates never store linkedTaskIds (see instanceFromTemplate) —
+      // strip it before saving one so it doesn't leak into future days.
+      const templateBase = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount };
 
       if (daysOfWeek && !wasRepeating) {
-        const template = { id: makeId("tpl"), ...base, daysOfWeek };
+        const template = { id: makeId("tpl"), ...templateBase, daysOfWeek };
         setTemplates((tpls) => [...tpls, template]);
         updateItems((its) => its.map((i) => (i.id === editingId ? { ...i, ...base, templateId: template.id } : i)));
         return;
@@ -95,7 +105,7 @@ export function usePlanner({ onItemContribution } = {}) {
       if (daysOfWeek && wasRepeating) {
         // Repeating -> repeating: update the underlying template so future
         // days pick up the new title/time/days-of-week too.
-        setTemplates((tpls) => tpls.map((t) => (t.id === current.templateId ? { ...t, ...base, daysOfWeek } : t)));
+        setTemplates((tpls) => tpls.map((t) => (t.id === current.templateId ? { ...t, ...templateBase, daysOfWeek } : t)));
         updateItems((its) => its.map((i) => (i.id === editingId ? { ...i, ...base } : i)));
         return;
       }
@@ -115,7 +125,7 @@ export function usePlanner({ onItemContribution } = {}) {
       updateItems((its) => [...its, instanceFromTemplate(template)]);
       return;
     }
-    updateItems((its) => [...its, { id: makeId("i"), ...base, templateId: null, done: false }]);
+    updateItems((its) => [...its, { id: makeId("i"), ...base, linkedTaskIds: linked, templateId: null, done: false }]);
   }
 
   function toggleItemDone(id) {
@@ -131,7 +141,11 @@ export function usePlanner({ onItemContribution } = {}) {
 
   function deleteItem(id) {
     const item = items.find((i) => i.id === id);
-    updateItems((its) => its.filter((i) => i.id !== id));
+    updateItems((its) =>
+      its
+        .filter((i) => i.id !== id)
+        .map((i) => (i.linkedTaskIds?.includes(id) ? { ...i, linkedTaskIds: i.linkedTaskIds.filter((tid) => tid !== id) } : i))
+    );
     if (item?.templateId) {
       setTemplates((tpls) => tpls.filter((t) => t.id !== item.templateId));
     }

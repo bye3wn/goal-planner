@@ -13,7 +13,7 @@ const DRAG_THRESHOLD_PX = 4;
 // continuously (not native HTML5 DnD), snaps to 15-minute increments, and
 // live-previews a "push everything below out of the way" layout so you can
 // see exactly where things will land before you let go.
-export default function CalendarGrid({ events, goalColor, onRescheduleEvents, onSlotClick, onEventClick }) {
+export default function CalendarGrid({ events, dayTasks, goalColor, onRescheduleEvents, onSlotClick, onEventClick }) {
   const gridRef = useRef(null);
   const gridHeight = HOURS.length * HOUR_HEIGHT_PX;
 
@@ -117,16 +117,22 @@ export default function CalendarGrid({ events, goalColor, onRescheduleEvents, on
             </div>
           ))}
 
-          {displayEvents.map((ev) => (
-            <EventBlock
-              key={ev.id}
-              event={ev}
-              color={goalColor(ev.goalId)}
-              dayStartHour={DAY_START_HOUR}
-              isDragging={drag?.id === ev.id}
-              onPointerDownEvent={handleEventPointerDown}
-            />
-          ))}
+          {displayEvents.map((ev) => {
+            const linkedStats = ev.linkedTaskIds?.length
+              ? { total: ev.linkedTaskIds.length, done: (dayTasks || []).filter((t) => ev.linkedTaskIds.includes(t.id) && t.done).length }
+              : null;
+            return (
+              <EventBlock
+                key={ev.id}
+                event={ev}
+                color={goalColor(ev.goalId)}
+                dayStartHour={DAY_START_HOUR}
+                isDragging={drag?.id === ev.id}
+                linkedStats={linkedStats}
+                onPointerDownEvent={handleEventPointerDown}
+              />
+            );
+          })}
 
           {/* Live time readout while dragging, so it's clear exactly where it'll land */}
           {drag && (

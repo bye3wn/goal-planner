@@ -126,6 +126,17 @@ export default function App() {
     if (editingId) updateMilestone(goalId, editingId, { title, mode, amount, unit });
     else addMilestone(goalId, title, mode, amount, unit);
   }
+  function handleAddSubtask(title, contributionAmount) {
+    const { goal, initial: milestone } = milestoneModal;
+    saveItem(
+      { kind: "task", title, start: null, duration: null, goalId: goal.id, milestoneId: milestone.id, contributionAmount, repeat: null },
+      undefined
+    );
+  }
+  function handleEditSubtask(item) {
+    setMilestoneModal(null);
+    openEditItem(item);
+  }
 
   return (
     <div style={{ background: COLORS.canvas, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }} className="w-full min-h-screen flex flex-col">
@@ -143,14 +154,17 @@ export default function App() {
           goals={goals}
           expanded={expanded}
           milestoneStats={milestoneStats}
+          allItems={allItems}
           onToggleExpanded={toggleExpanded}
           onAddGoalClick={openAddGoal}
           onEditGoal={openEditGoal}
           onAddMilestone={openAddMilestone}
           onMilestoneClick={openEditMilestone}
+          onToggleSubtaskDone={toggleItemDone}
         />
         <CalendarGrid
           events={events}
+          dayTasks={tasks}
           goalColor={goalColor}
           onRescheduleEvents={rescheduleEvents}
           onSlotClick={openCreateEvent}
@@ -169,6 +183,8 @@ export default function App() {
         open={!!itemModal}
         initial={itemModal?.initial}
         goals={goals}
+        dayTasks={tasks}
+        onToggleTaskDone={toggleItemDone}
         onSave={saveItem}
         onDelete={deleteItem}
         onClose={() => setItemModal(null)}
@@ -186,8 +202,13 @@ export default function App() {
         open={!!milestoneModal}
         goal={milestoneModal?.goal}
         initial={milestoneModal?.initial}
+        subtasks={milestoneModal?.initial ? allItems.filter((i) => i.milestoneId === milestoneModal.initial.id) : []}
         onSave={handleSaveMilestone}
         onDelete={deleteMilestone}
+        onAddSubtask={handleAddSubtask}
+        onToggleSubtaskDone={toggleItemDone}
+        onDeleteSubtask={deleteItem}
+        onEditSubtask={handleEditSubtask}
         onClose={() => setMilestoneModal(null)}
       />
     </div>

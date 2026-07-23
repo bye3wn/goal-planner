@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { X, Trash2, CalendarClock, ListChecks } from "lucide-react";
+import { X, Trash2, CalendarClock, ListChecks, Circle, CheckCircle2 } from "lucide-react";
 import { COLORS, TIME_SLOTS, DURATION_OPTIONS, REPEAT_OPTIONS, WEEKDAYS, ALL_WEEKDAYS } from "../../constants/theme";
 import { formatTime, formatDuration } from "../../utils/date";
 
@@ -13,16 +13,22 @@ const EMPTY = {
   contributionAmount: "",
   repeatType: "none", // "none" | "daily" | "custom"
   daysOfWeek: [],
+  linkedTaskIds: [],
 };
 
 // The "bigger box" — used for both creating a new item and editing an
 // existing one. Opened from the calendar grid, the tasks panel, or by
 // clicking an existing item.
-export default function ItemModal({ open, initial, goals, onSave, onDelete, onClose }) {
+//
+// dayTasks: the current day's task-kind items, offered as attachable
+// subtasks when editing an event (so you can see "what do I need to get
+// done during this" right on the event itself). onToggleTaskDone lets you
+// check them off from here directly, same as the tasks panel.
+export default function ItemModal({ open, initial, goals, dayTasks, onToggleTaskDone, onSave, onDelete, onClose }) {
   const [form, setForm] = useState(EMPTY);
 
   useEffect(() => {
-    if (open) setForm({ ...EMPTY, ...initial });
+    if (open) setForm({ ...EMPTY, ...initial, linkedTaskIds: initial?.linkedTaskIds || [] });
   }, [open, initial]);
 
   if (!open) return null;
@@ -43,6 +49,13 @@ export default function ItemModal({ open, initial, goals, onSave, onDelete, onCl
     }));
   }
 
+  function toggleLinkedTask(taskId) {
+    setForm((f) => ({
+      ...f,
+      linkedTaskIds: f.linkedTaskIds.includes(taskId) ? f.linkedTaskIds.filter((id) => id !== taskId) : [...f.linkedTaskIds, taskId],
+    }));
+  }
+
   function submit() {
     if (!form.title.trim()) return;
     let repeat = null;
@@ -59,6 +72,7 @@ export default function ItemModal({ open, initial, goals, onSave, onDelete, onCl
         milestoneId: form.milestoneId || null,
         contributionAmount: isManualCountdown && form.contributionAmount ? Number(form.contributionAmount) : null,
         repeat,
+        linkedTaskIds: form.kind === "event" ? form.linkedTaskIds : [],
       },
       initial?.id
     );
@@ -201,6 +215,38 @@ export default function ItemModal({ open, initial, goals, onSave, onDelete, onCl
             <p className="text-xs px-3 py-2 rounded-md" style={{ background: COLORS.canvas, color: COLORS.inkFaint }}>
               Checking this off counts as one day toward "{selectedMilestone.title}" automatically.
             </p>
+          )}
+
+          {form.kind === "event" && (
+            <div>
+              <label className="text-xs font-medium block mb-1.5" style={{ color: COLORS.inkFaint }}>
+                Tasks to complete during this event
+              </label>
+              {(!dayTasks || dayTasks.length === 0) ? (
+                <p className="text-xs" style={{ color: COLORS.inkFaint }}>
+                  No tasks on the tasks panel for this day yet.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-1 rounded-md border p-2" style={{ borderColor: COLORS.line }}>
+                  {dayTasks.map((t) => (
+                    <div key={t.id} className="flex items-center gap-2 py-0.5">
+                      <input
+                        type="checkbox"
+                        checked={form.linkedTaskIds.includes(t.id)}
+                        onChange={() => toggleLinkedTask(t.id)}
+                        title="Attach to this event"
+                      />
+                      <button onClick={() => onToggleTaskDone(t.id)} className="flex-shrink-0" title="Mark done">
+                        {t.done ? <CheckCircle2 size={14} color={COLORS.forest} /> : <Circle size={14} color={COLORS.inkFaint} />}
+                      </button>
+                      <span className="text-sm flex-1 truncate" style={{ textDecoration: t.done ? "line-through" : "none", color: t.done ? COLORS.inkFaint : COLORS.ink }}>
+                        {t.title}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           <div>

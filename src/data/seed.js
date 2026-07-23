@@ -92,6 +92,7 @@ export function seedItemsFor(key) {
       contributionAmount: null,
       templateId: null,
       done: false,
+      linkedTaskIds: [], // ids of task-kind items to complete during this event
     },
     {
       id: "i2",
@@ -104,6 +105,7 @@ export function seedItemsFor(key) {
       contributionAmount: null,
       templateId: null,
       done: false,
+      linkedTaskIds: [],
     },
     {
       id: "i3",
@@ -116,6 +118,7 @@ export function seedItemsFor(key) {
       contributionAmount: null,
       templateId: null,
       done: false,
+      linkedTaskIds: [],
     },
   ].map((t) => ({ ...t, id: `${t.id}-${key}` }));
 }

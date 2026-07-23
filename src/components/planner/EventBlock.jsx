@@ -1,5 +1,5 @@
 import React from "react";
-import { Repeat } from "lucide-react";
+import { Repeat, ListChecks } from "lucide-react";
 import { COLORS, HOUR_HEIGHT_PX } from "../../constants/theme";
 import { formatTime } from "../../utils/date";
 
@@ -7,7 +7,7 @@ import { formatTime } from "../../utils/date";
 // start/duration so the block's size visually matches how long it takes.
 // Dragging is pointer-based (not native HTML5 DnD) so the parent grid can
 // track motion continuously and animate other events out of the way live.
-export default function EventBlock({ event, color, dayStartHour, isDragging, onPointerDownEvent }) {
+export default function EventBlock({ event, color, dayStartHour, isDragging, linkedStats, onPointerDownEvent }) {
   const top = (event.start - dayStartHour) * HOUR_HEIGHT_PX;
   const height = Math.max(22, event.duration * HOUR_HEIGHT_PX - 2);
 
@@ -41,9 +41,16 @@ export default function EventBlock({ event, color, dayStartHour, isDragging, onP
         {event.templateId && <Repeat size={11} color={COLORS.inkFaint} className="flex-shrink-0" />}
       </div>
       {height > 34 && (
-        <span className="font-mono text-[10px]" style={{ color: COLORS.inkFaint }}>
-          {formatTime(event.start)}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10px]" style={{ color: COLORS.inkFaint }}>
+            {formatTime(event.start)}
+          </span>
+          {linkedStats && linkedStats.total > 0 && (
+            <span className="flex items-center gap-0.5 font-mono text-[10px]" style={{ color: COLORS.inkFaint }}>
+              <ListChecks size={10} /> {linkedStats.done}/{linkedStats.total}
+            </span>
+          )}
+        </div>
       )}
     </div>
   );
