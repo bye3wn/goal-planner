@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { COLORS } from "../../constants/theme";
 import GoalRow from "./GoalRow";
 
-export default function Sidebar({ goals, expanded, milestoneStats, allItems, onToggleExpanded, onAddGoalClick, onEditGoal, onAddMilestone, onMilestoneClick, onToggleSubtaskDone }) {
+export default function Sidebar({ goals, expanded, milestoneStats, allItems, rangeDateKeys, onToggleExpanded, onAddGoalClick, onEditGoal, onAddMilestone, onMilestoneClick, onToggleSubtaskDone }) {
   return (
     <aside
       className="w-[320px] flex-shrink-0 overflow-y-auto px-5 py-5"
@@ -26,6 +26,7 @@ export default function Sidebar({ goals, expanded, milestoneStats, allItems, onT
             isOpen={!!expanded[goal.id]}
             milestoneStats={milestoneStats}
             allItems={allItems}
+            rangeDateKeys={rangeDateKeys}
             onToggle={onToggleExpanded}
             onEditGoal={onEditGoal}
             onAddMilestone={onAddMilestone}

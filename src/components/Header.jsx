@@ -1,5 +1,5 @@
 import React from "react";
-import { Flag, ChevronLeft, ChevronRight } from "lucide-react";
+import { Flag, ChevronLeft, ChevronRight, Moon } from "lucide-react";
 import { COLORS, CALENDAR_VIEWS } from "../constants/theme";
 import { formatDateHeading } from "../utils/date";
 import { formatMonthYear, formatWeekRange } from "../utils/calendarRange";
@@ -12,7 +12,7 @@ function rangeLabel(date, view) {
   return "";
 }
 
-export default function Header({ currentDate, view, onSetView, onPrev, onNext, onToday }) {
+export default function Header({ currentDate, view, onSetView, onPrev, onNext, onToday, onOpenSleepSchedule }) {
   return (
     <header
       className="flex items-center justify-between px-6 py-4 flex-shrink-0 flex-wrap gap-3"
@@ -44,20 +44,31 @@ export default function Header({ currentDate, view, onSetView, onPrev, onNext, o
         </button>
       </div>
 
-      <div className="flex items-center rounded-md border overflow-hidden" style={{ borderColor: COLORS.line }}>
-        {CALENDAR_VIEWS.map((v) => (
-          <button
-            key={v}
-            onClick={() => onSetView(v)}
-            className="px-3 py-1.5 text-xs capitalize transition-colors"
-            style={{
-              background: view === v ? COLORS.forest : "transparent",
-              color: view === v ? "#fff" : COLORS.inkFaint,
-            }}
-          >
-            {v}
-          </button>
-        ))}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onOpenSleepSchedule}
+          className="p-1.5 rounded-md border hover:bg-black/5 transition-colors"
+          style={{ borderColor: COLORS.line }}
+          title="Set sleep schedule"
+          aria-label="Set sleep schedule"
+        >
+          <Moon size={16} color={COLORS.inkFaint} />
+        </button>
+        <div className="flex items-center rounded-md border overflow-hidden" style={{ borderColor: COLORS.line }}>
+          {CALENDAR_VIEWS.map((v) => (
+            <button
+              key={v}
+              onClick={() => onSetView(v)}
+              className="px-3 py-1.5 text-xs capitalize transition-colors"
+              style={{
+                background: view === v ? COLORS.forest : "transparent",
+                color: view === v ? "#fff" : COLORS.inkFaint,
+              }}
+            >
+              {v}
+            </button>
+          ))}
+        </div>
       </div>
     </header>
   );

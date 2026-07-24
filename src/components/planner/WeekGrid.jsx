@@ -81,17 +81,18 @@ export default function WeekGrid({ weekDates, allItems, goalColor, onSlotClick, 
                     style={{
                       top,
                       height,
-                      background: ev.done ? "#F4F3EE" : COLORS.panel,
-                      border: `1px solid ${COLORS.line}`,
-                      borderLeft: `3px solid ${goalColor(ev.goalId)}`,
-                      opacity: ev.done ? 0.6 : 1,
+                      background: ev.isSleep ? COLORS.sleep : ev.done ? "#F4F3EE" : COLORS.panel,
+                      border: `1px solid ${ev.isSleep ? COLORS.sleep : COLORS.line}`,
+                      borderLeft: `3px solid ${ev.isSleep ? COLORS.sleep : goalColor(ev.goalId)}`,
+                      opacity: ev.done && !ev.isSleep ? 0.6 : 1,
+                      color: ev.isSleep ? "#E7E9E3" : COLORS.ink,
                     }}
                   >
-                    <div className="text-[11px] font-medium truncate" style={{ textDecoration: ev.done ? "line-through" : "none" }}>
+                    <div className="text-[11px] font-medium truncate" style={{ textDecoration: ev.done && !ev.isSleep ? "line-through" : "none" }}>
                       {ev.title}
                     </div>
                     {height > 30 && (
-                      <div className="font-mono text-[9px]" style={{ color: COLORS.inkFaint }}>
+                      <div className="font-mono text-[9px]" style={{ color: ev.isSleep ? "#9BA39A" : COLORS.inkFaint }}>
                         {formatTime(ev.start)}
                       </div>
                     )}

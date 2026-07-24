@@ -54,7 +54,12 @@ export default function MonthGrid({ gridDates, currentMonth, allItems, goalColor
                           onEventClick(ev, d);
                         }}
                         className="text-[10px] truncate px-1 py-0.5 rounded"
-                        style={{ background: COLORS.canvas, borderLeft: `2px solid ${goalColor(ev.goalId)}`, textDecoration: ev.done ? "line-through" : "none" }}
+                        style={{
+                          background: ev.isSleep ? COLORS.sleep : COLORS.canvas,
+                          color: ev.isSleep ? "#E7E9E3" : COLORS.ink,
+                          borderLeft: `2px solid ${ev.isSleep ? COLORS.sleep : goalColor(ev.goalId)}`,
+                          textDecoration: ev.done && !ev.isSleep ? "line-through" : "none",
+                        }}
                       >
                         {ev.title}
                       </span>

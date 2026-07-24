@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { COLORS, FONT_IMPORT_URL } from "./constants/theme";
 import { daysBetween, dateKey } from "./utils/date";
-import { getWeekDates, getMonthGridDates, getYearMonths } from "./utils/calendarRange";
+import { getWeekDates, getMonthGridDates, getMonthDates, getYearMonths } from "./utils/calendarRange";
 import { useGoals } from "./hooks/useGoals";
 import { usePlanner } from "./hooks/usePlanner";
 import Header from "./components/Header";
@@ -14,6 +14,7 @@ import MonthGrid from "./components/planner/MonthGrid";
 import YearGrid from "./components/planner/YearGrid";
 import TasksPanel from "./components/planner/TasksPanel";
 import ItemModal from "./components/planner/ItemModal";
+import SleepScheduleModal from "./components/planner/SleepScheduleModal";
 
 // This file should stay thin: it connects state (from hooks) to UI (from
 // components) and holds no logic of its own, with three exceptions:
@@ -56,15 +57,31 @@ export default function App() {
     toggleItemDone,
     deleteItem,
     rescheduleEvents,
+    saveSleepSchedule,
+    getSleepSchedule,
   } = usePlanner({ onItemContribution: addMilestoneProgress });
 
   const [itemModal, setItemModal] = useState(null); // null | { initial, targetDateKey }
   const [goalModal, setGoalModal] = useState(null); // null | { initial }
   const [milestoneModal, setMilestoneModal] = useState(null); // null | { goal, initial }
+  const [sleepModalOpen, setSleepModalOpen] = useState(false);
 
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate]);
   const monthGridDates = useMemo(() => getMonthGridDates(currentDate), [currentDate]);
   const yearMonths = useMemo(() => getYearMonths(currentDate), [currentDate]);
+
+  // Which dates count toward a milestone's repeating-subtask fraction in
+  // the sidebar preview — scoped to whatever calendar view is active, so
+  // switching from year to day changes the denominator to match (year:
+  // every real day across all 12 months; month: real days only, not the
+  // padded grid; week: the 7 visible days; day: just today).
+  const milestoneRangeKeys = useMemo(() => {
+    if (view === "day") return [dateKey(currentDate)];
+    if (view === "week") return weekDates.map(dateKey);
+    if (view === "month") return getMonthDates(currentDate).map(dateKey);
+    if (view === "year") return yearMonths.flatMap((m) => getMonthDates(m).map(dateKey));
+    return [dateKey(currentDate)];
+  }, [view, currentDate, weekDates, yearMonths]);
 
   // Derives every milestone's completion + display label from its subtasks.
   // Three modes, matching what MilestoneModal lets you pick:
@@ -178,7 +195,15 @@ export default function App() {
         * { scrollbar-width: thin; }
       `}</style>
 
-      <Header currentDate={currentDate} view={view} onSetView={setView} onPrev={goToPrev} onNext={goToNext} onToday={goToToday} />
+      <Header
+        currentDate={currentDate}
+        view={view}
+        onSetView={setView}
+        onPrev={goToPrev}
+        onNext={goToNext}
+        onToday={goToToday}
+        onOpenSleepSchedule={() => setSleepModalOpen(true)}
+      />
 
       <div className="flex flex-1 min-h-0">
         <Sidebar
@@ -186,6 +211,7 @@ export default function App() {
           expanded={expanded}
           milestoneStats={milestoneStats}
           allItems={allItems}
+          rangeDateKeys={milestoneRangeKeys}
           onToggleExpanded={toggleExpanded}
           onAddGoalClick={openAddGoal}
           onEditGoal={openEditGoal}
@@ -276,6 +302,13 @@ export default function App() {
         onDeleteSubtask={deleteItem}
         onEditSubtask={handleEditSubtask}
         onClose={() => setMilestoneModal(null)}
+      />
+
+      <SleepScheduleModal
+        open={sleepModalOpen}
+        initialSchedule={sleepModalOpen ? getSleepSchedule() : {}}
+        onSave={saveSleepSchedule}
+        onClose={() => setSleepModalOpen(false)}
       />
     </div>
   );

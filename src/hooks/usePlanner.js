@@ -16,6 +16,7 @@ function instanceFromTemplate(template) {
     contributionAmount: template.contributionAmount,
     templateId: template.id,
     done: false,
+    isSleep: template.isSleep || false,
     // Which day's tasks to complete during this event — a fresh empty list
     // each day, since which tasks exist that day is different every time a
     // repeating event regenerates.
@@ -200,6 +201,60 @@ export function usePlanner({ onItemContribution } = {}) {
     updateItemsAt(dateKeyStr, (its) => its.map((i) => (startById.has(i.id) ? { ...i, start: startById.get(i.id) } : i)));
   }
 
+  // schedule: { [dayOfWeek 0-6]: { bedtime: decimalHour|null, wake: decimalHour|null } }
+  // A night's sleep crosses midnight, which the single-day grid can't
+  // represent as one block — so each day gets up to two pieces instead:
+  // a "went to bed" block from bedtime to midnight that night, and a
+  // "woke up" block from midnight to wake time that morning. Rendered
+  // dark, they visually read as one continuous stretch across the two
+  // adjacent days in week view.
+  //
+  // Re-saving replaces the whole schedule — old sleep templates (and every
+  // instance already generated from them) are removed first so editing
+  // your bedtime doesn't leave a stray duplicate schedule behind.
+  function saveSleepSchedule(schedule) {
+    const oldSleepTemplateIds = new Set(templates.filter((t) => t.isSleep).map((t) => t.id));
+
+    const newTemplates = [];
+    for (const [dowStr, { bedtime, wake }] of Object.entries(schedule)) {
+      const dow = Number(dowStr);
+      if (bedtime != null) {
+        newTemplates.push({
+          id: makeId("tpl"), kind: "event", title: "Sleep", start: bedtime, duration: 24 - bedtime,
+          goalId: null, milestoneId: null, contributionAmount: null, daysOfWeek: [dow], isSleep: true,
+        });
+      }
+      if (wake != null) {
+        newTemplates.push({
+          id: makeId("tpl"), kind: "event", title: "Sleep", start: 0, duration: wake,
+          goalId: null, milestoneId: null, contributionAmount: null, daysOfWeek: [dow], isSleep: true,
+        });
+      }
+    }
+
+    setTemplates((tpls) => [...tpls.filter((t) => !t.isSleep), ...newTemplates]);
+    setItemsByDate((prev) => {
+      const next = {};
+      for (const [k, arr] of Object.entries(prev)) {
+        next[k] = arr.filter((i) => !oldSleepTemplateIds.has(i.templateId));
+      }
+      return next;
+    });
+  }
+
+  // Reconstructs the current per-weekday schedule from the sleep templates,
+  // so the schedule modal can prefill with what's already set.
+  function getSleepSchedule() {
+    const schedule = {};
+    for (const t of templates.filter((t) => t.isSleep)) {
+      const dow = t.daysOfWeek[0];
+      schedule[dow] = schedule[dow] || {};
+      if (t.start === 0) schedule[dow].wake = t.duration;
+      else schedule[dow].bedtime = t.start;
+    }
+    return schedule;
+  }
+
   return {
     view,
     setView,
@@ -216,5 +271,7 @@ export function usePlanner({ onItemContribution } = {}) {
     toggleItemDone,
     deleteItem,
     rescheduleEvents,
+    saveSleepSchedule,
+    getSleepSchedule,
   };
 }

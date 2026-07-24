@@ -27,6 +27,18 @@ export function formatDuration(hours) {
   return Number.isInteger(hours) ? `${hours} hrs` : `${hours} hrs`;
 }
 
+// Converts to/from the "HH:MM" strings native <input type="time"> uses.
+export function decimalToTimeString(decimalHour) {
+  const h = Math.floor(decimalHour);
+  const m = Math.round((decimalHour % 1) * 60);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+export function timeStringToDecimal(timeStr) {
+  const [h, m] = timeStr.split(":").map(Number);
+  return h + m / 60;
+}
+
 export function formatDateHeading(d) {
   return d.toLocaleDateString(undefined, {
     weekday: "long",

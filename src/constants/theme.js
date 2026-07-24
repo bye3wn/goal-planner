@@ -9,6 +9,9 @@ export const COLORS = {
   line: "#DAD9CB",
   forest: "#1F3D2E",
   blaze: "#E2661F",
+  // Deliberately distinct from every goal color so a sleep block reads as
+  // "night time" at a glance, never mistaken for a goal-linked event.
+  sleep: "#171D1A",
 };
 
 // Selectable colors when creating a new goal. Add/remove entries here to
