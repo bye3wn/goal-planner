@@ -202,33 +202,43 @@ export function usePlanner({ onItemContribution } = {}) {
   }
 
   // schedule: { [dayOfWeek 0-6]: { bedtime: decimalHour|null, wake: decimalHour|null } }
-  // A night's sleep crosses midnight, which the single-day grid can't
-  // represent as one block — so each day gets up to two pieces instead:
-  // a "went to bed" block from bedtime to midnight that night, and a
-  // "woke up" block from midnight to wake time that morning. Rendered
-  // dark, they visually read as one continuous stretch across the two
-  // adjacent days in week view.
+  //
+  // Bedtime isn't always "in the evening" — a bedtime of 1am or 2am means
+  // you're still awake past midnight, so that night's sleep doesn't cross
+  // into the next calendar day at all. We only split into two pieces (an
+  // evening block + a next-morning block) when bedtime is actually LATER
+  // in the day than wake time (e.g. 11pm bed, 7am wake). When bedtime is
+  // earlier than wake (e.g. 1am bed, 9am wake), it's one same-day block.
+  //
+  // sleepDay/sleepPart are bookkeeping only — they record which weekday's
+  // row in the schedule form a block came from and which half it is, so
+  // getSleepSchedule() can rebuild the form correctly even though the
+  // "wake" half of a crossing pair actually renders on the NEXT weekday.
   //
   // Re-saving replaces the whole schedule — old sleep templates (and every
   // instance already generated from them) are removed first so editing
   // your bedtime doesn't leave a stray duplicate schedule behind.
   function saveSleepSchedule(schedule) {
     const oldSleepTemplateIds = new Set(templates.filter((t) => t.isSleep).map((t) => t.id));
+    const common = { kind: "event", title: "Sleep", goalId: null, milestoneId: null, contributionAmount: null, isSleep: true };
 
     const newTemplates = [];
     for (const [dowStr, { bedtime, wake }] of Object.entries(schedule)) {
       const dow = Number(dowStr);
-      if (bedtime != null) {
-        newTemplates.push({
-          id: makeId("tpl"), kind: "event", title: "Sleep", start: bedtime, duration: 24 - bedtime,
-          goalId: null, milestoneId: null, contributionAmount: null, daysOfWeek: [dow], isSleep: true,
-        });
-      }
-      if (wake != null) {
-        newTemplates.push({
-          id: makeId("tpl"), kind: "event", title: "Sleep", start: 0, duration: wake,
-          goalId: null, milestoneId: null, contributionAmount: null, daysOfWeek: [dow], isSleep: true,
-        });
+      if (bedtime != null && wake != null) {
+        if (bedtime < wake) {
+          // Same calendar day — e.g. bed 1am, wake 9am.
+          newTemplates.push({ id: makeId("tpl"), ...common, start: bedtime, duration: wake - bedtime, daysOfWeek: [dow], sleepDay: dow, sleepPart: "sameday" });
+        } else {
+          // Crosses midnight — e.g. bed 11pm, wake 7am. The wake half
+          // belongs to the NEXT weekday.
+          newTemplates.push({ id: makeId("tpl"), ...common, start: bedtime, duration: 24 - bedtime, daysOfWeek: [dow], sleepDay: dow, sleepPart: "bedtime" });
+          newTemplates.push({ id: makeId("tpl"), ...common, start: 0, duration: wake, daysOfWeek: [(dow + 1) % 7], sleepDay: dow, sleepPart: "wake" });
+        }
+      } else if (bedtime != null) {
+        newTemplates.push({ id: makeId("tpl"), ...common, start: bedtime, duration: 24 - bedtime, daysOfWeek: [dow], sleepDay: dow, sleepPart: "bedtime" });
+      } else if (wake != null) {
+        newTemplates.push({ id: makeId("tpl"), ...common, start: 0, duration: wake, daysOfWeek: [dow], sleepDay: dow, sleepPart: "wake" });
       }
     }
 
@@ -243,14 +253,22 @@ export function usePlanner({ onItemContribution } = {}) {
   }
 
   // Reconstructs the current per-weekday schedule from the sleep templates,
-  // so the schedule modal can prefill with what's already set.
+  // so the schedule modal can prefill with what's already set. Uses
+  // sleepDay (not daysOfWeek) since the wake half of a crossing pair
+  // visually lives on the next weekday but still belongs to this row.
   function getSleepSchedule() {
     const schedule = {};
     for (const t of templates.filter((t) => t.isSleep)) {
-      const dow = t.daysOfWeek[0];
+      const dow = t.sleepDay;
       schedule[dow] = schedule[dow] || {};
-      if (t.start === 0) schedule[dow].wake = t.duration;
-      else schedule[dow].bedtime = t.start;
+      if (t.sleepPart === "sameday") {
+        schedule[dow].bedtime = t.start;
+        schedule[dow].wake = t.start + t.duration;
+      } else if (t.sleepPart === "bedtime") {
+        schedule[dow].bedtime = t.start;
+      } else if (t.sleepPart === "wake") {
+        schedule[dow].wake = t.duration;
+      }
     }
     return schedule;
   }

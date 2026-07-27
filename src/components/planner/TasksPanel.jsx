@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Circle, CheckCircle2, Repeat, Plus, ChevronDown, ChevronRight } from "lucide-react";
+import { Circle, CheckCircle2, Repeat, Plus } from "lucide-react";
 import { COLORS, MONTH_LABELS } from "../../constants/theme";
 import { dateKey } from "../../utils/date";
 import { getWeekDates, getMonthDates, getYearMonths, formatDayShort } from "../../utils/calendarRange";
@@ -36,50 +36,22 @@ function TaskRow({ t, goalColor, onToggleDone, onTaskClick, dateLabel }) {
 // denominator is just however many instances exist in the current range
 // (already generated correctly per-view by usePlanner), so it naturally
 // tracks the active view: 1 in day view, up to 7 in week, the days-due in
-// month, all of them in year. Expand to check off (or edit) a specific day.
-function RepeatingGroupRow({ group, goalColor, onToggleDone, onTaskClick }) {
-  const [open, setOpen] = useState(false);
+// month, all of them in year. Click to open today's instance (or the
+// closest one in range) for editing — no per-day breakdown here, just the
+// fraction.
+function RepeatingGroupRow({ group, goalColor, onTaskClick }) {
   const color = goalColor(group.instances[0]?.goalId);
+  const today = dateKey(new Date());
+  const representative = group.instances.find((i) => i.date === today) || group.instances[0];
 
   return (
-    <div>
-      <div className="flex items-center gap-1.5 py-1">
-        <button onClick={() => setOpen((o) => !o)} className="flex-shrink-0">
-          {open ? <ChevronDown size={13} color={COLORS.inkFaint} /> : <ChevronRight size={13} color={COLORS.inkFaint} />}
-        </button>
-        <Repeat size={12} color={COLORS.inkFaint} className="flex-shrink-0" />
-        <button onClick={() => onTaskClick(group.instances[0])} className="flex-1 text-left text-sm truncate min-w-0">
-          {group.title}
-        </button>
-        <span className="font-mono text-[11px] flex-shrink-0" style={{ color: group.doneCount === group.total ? color : COLORS.inkFaint }}>
-          {group.doneCount}/{group.total}
-        </span>
-      </div>
-      {open && (
-        <div className="ml-5 flex flex-col gap-0.5 mb-1">
-          {group.instances
-            .slice()
-            .sort((a, b) => a.date.localeCompare(b.date))
-            .map((inst) => (
-              <div key={inst.id} className="flex items-center gap-2 py-0.5">
-                <button onClick={() => onToggleDone(inst.id)} className="flex-shrink-0">
-                  {inst.done ? <CheckCircle2 size={13} color={color} /> : <Circle size={13} color={COLORS.inkFaint} />}
-                </button>
-                <span className="font-mono text-[10px] flex-shrink-0" style={{ color: COLORS.inkFaint }}>
-                  {formatDayShort(new Date(inst.date + "T00:00:00"))}
-                </span>
-                <button
-                  onClick={() => onTaskClick(inst)}
-                  className="text-xs truncate flex-1 text-left"
-                  style={{ color: inst.done ? COLORS.inkFaint : COLORS.ink, textDecoration: inst.done ? "line-through" : "none" }}
-                >
-                  {inst.title}
-                </button>
-              </div>
-            ))}
-        </div>
-      )}
-    </div>
+    <button onClick={() => onTaskClick(representative)} className="w-full flex items-center gap-1.5 py-1 text-left">
+      <Repeat size={12} color={COLORS.inkFaint} className="flex-shrink-0" />
+      <span className="flex-1 text-sm truncate min-w-0">{group.title}</span>
+      <span className="font-mono text-[11px] flex-shrink-0" style={{ color: group.doneCount === group.total ? color : COLORS.inkFaint }}>
+        {group.doneCount}/{group.total}
+      </span>
+    </button>
   );
 }
 
@@ -197,7 +169,7 @@ export default function TasksPanel({ view, currentDate, allItems, goalColor, onT
                   Repeating
                 </div>
                 {data.groups.map((g) => (
-                  <RepeatingGroupRow key={g.templateId} group={g} goalColor={goalColor} onToggleDone={onToggleDone} onTaskClick={onTaskClick} />
+                  <RepeatingGroupRow key={g.templateId} group={g} goalColor={goalColor} onTaskClick={onTaskClick} />
                 ))}
               </div>
             )}
@@ -234,7 +206,7 @@ export default function TasksPanel({ view, currentDate, allItems, goalColor, onT
                 Repeating
               </div>
               {yearData.groups.map((g) => (
-                <RepeatingGroupRow key={g.templateId} group={g} goalColor={goalColor} onToggleDone={onToggleDone} onTaskClick={onTaskClick} />
+                <RepeatingGroupRow key={g.templateId} group={g} goalColor={goalColor} onTaskClick={onTaskClick} />
               ))}
             </div>
           )}
