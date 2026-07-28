@@ -66,6 +66,16 @@ export default function ItemModal({ open, initial, goals, dayTasks, onToggleTask
     if (form.repeatType === "daily") repeat = { daysOfWeek: ALL_WEEKDAYS };
     else if (form.repeatType === "custom" && form.daysOfWeek.length > 0) repeat = { daysOfWeek: form.daysOfWeek };
 
+    // A repeating subtask linked to a goal only makes sense for the life
+    // of that goal — bound it to when the goal was created through its
+    // deadline (if it has one), instead of generating forever.
+    if (repeat && form.goalId) {
+      const linkedGoal = goals.find((g) => g.id === form.goalId);
+      if (linkedGoal) {
+        repeat = { ...repeat, startDate: linkedGoal.createdAt, endDate: linkedGoal.deadline || null };
+      }
+    }
+
     onSave(
       {
         kind: form.kind,
@@ -325,6 +335,21 @@ export default function ItemModal({ open, initial, goals, dayTasks, onToggleTask
                 ))}
               </div>
             )}
+
+            {form.repeatType !== "none" && form.goalId && (() => {
+              const linkedGoal = goals.find((g) => g.id === form.goalId);
+              if (!linkedGoal) return null;
+              return (
+                <p className="text-[11px] mt-2" style={{ color: COLORS.inkFaint }}>
+                  Since this is linked to <strong>{linkedGoal.title}</strong>, it'll only repeat from{" "}
+                  {new Date(linkedGoal.createdAt + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                  {linkedGoal.deadline
+                    ? ` through its deadline (${new Date(linkedGoal.deadline + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })})`
+                    : " onward — this goal has no deadline set, so it repeats indefinitely"}
+                  .
+                </p>
+              );
+            })()}
           </div>
         </div>
 

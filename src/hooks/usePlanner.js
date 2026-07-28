@@ -61,9 +61,11 @@ export function usePlanner({ onItemContribution } = {}) {
   );
 
   // Makes sure every date key in `keys` has a fresh instance of every
-  // template whose recurrence includes that date's day of week. Batches
-  // everything into one state update regardless of how many dates (so
-  // switching to year view doesn't cause 365 separate re-renders).
+  // template whose recurrence includes that date's day of week AND falls
+  // within the template's startDate/endDate bounds (if it has any — a
+  // subtask linked to a goal is bounded to that goal's lifespan; see
+  // saveItem). Batches everything into one state update regardless of how
+  // many dates (so switching to year view doesn't cause 365 re-renders).
   function ensureDateRange(keys) {
     setItemsByDate((prev) => {
       let changed = false;
@@ -72,7 +74,13 @@ export function usePlanner({ onItemContribution } = {}) {
         const existing = next[k];
         const dow = new Date(k + "T00:00:00").getDay();
         const haveTemplateIds = new Set((existing || []).map((i) => i.templateId).filter(Boolean));
-        const due = templates.filter((t) => t.daysOfWeek.includes(dow) && !haveTemplateIds.has(t.id));
+        const due = templates.filter(
+          (t) =>
+            t.daysOfWeek.includes(dow) &&
+            !haveTemplateIds.has(t.id) &&
+            (!t.startDate || k >= t.startDate) &&
+            (!t.endDate || k <= t.endDate)
+        );
         if (due.length > 0 || !existing) {
           next[k] = [...(existing || []), ...due.map(instanceFromTemplate)];
           changed = true;
@@ -114,15 +122,20 @@ export function usePlanner({ onItemContribution } = {}) {
     setItemsByDate((prev) => ({ ...prev, [dateKeyStr]: updater(prev[dateKeyStr] || []) }));
   }
 
-  // repeat: null (one-off) or { daysOfWeek: [0..6] } (recurring on those
-  // weekdays — pass all seven for "daily", a subset for "every Monday and
-  // Wednesday" etc). linkedTaskIds is only meaningful for events.
-  // targetDateKey is which day a NEW item is created on (ignored when
-  // editing — edits stay on the item's existing date).
+  // repeat: null (one-off) or { daysOfWeek: [0..6], startDate?, endDate? }
+  // (recurring on those weekdays — pass all seven for "daily", a subset for
+  // "every Monday and Wednesday" etc). startDate/endDate bound a goal-linked
+  // subtask to that goal's lifespan (computed by the caller — see
+  // ItemModal, which knows the goal's createdAt/deadline); omit them for an
+  // open-ended repeat, like a habit with no goal attached.
+  // linkedTaskIds is only meaningful for events. targetDateKey is which day
+  // a NEW item is created on (ignored when editing — edits stay on the
+  // item's existing date).
   function saveItem(payload, editingId, targetDateKey = key) {
     const { kind, title, start, duration, goalId, milestoneId, contributionAmount, repeat, linkedTaskIds } = payload;
     if (!title.trim()) return;
     const daysOfWeek = repeat ? repeat.daysOfWeek : null;
+    const bounds = repeat ? { startDate: repeat.startDate || null, endDate: repeat.endDate || null } : {};
     const linked = kind === "event" ? linkedTaskIds || [] : undefined;
 
     if (editingId) {
@@ -134,13 +147,13 @@ export function usePlanner({ onItemContribution } = {}) {
       const templateBase = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount };
 
       if (daysOfWeek && !wasRepeating) {
-        const template = { id: makeId("tpl"), ...templateBase, daysOfWeek };
+        const template = { id: makeId("tpl"), ...templateBase, daysOfWeek, ...bounds };
         setTemplates((tpls) => [...tpls, template]);
         updateItemsAt(dk, (its) => its.map((i) => (i.id === editingId ? { ...i, ...base, templateId: template.id } : i)));
         return;
       }
       if (daysOfWeek && wasRepeating) {
-        setTemplates((tpls) => tpls.map((t) => (t.id === current.templateId ? { ...t, ...templateBase, daysOfWeek } : t)));
+        setTemplates((tpls) => tpls.map((t) => (t.id === current.templateId ? { ...t, ...templateBase, daysOfWeek, ...bounds } : t)));
         updateItemsAt(dk, (its) => its.map((i) => (i.id === editingId ? { ...i, ...base } : i)));
         return;
       }
@@ -154,7 +167,7 @@ export function usePlanner({ onItemContribution } = {}) {
     // Creating new
     const base = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount };
     if (daysOfWeek) {
-      const template = { id: makeId("tpl"), ...base, daysOfWeek };
+      const template = { id: makeId("tpl"), ...base, daysOfWeek, ...bounds };
       setTemplates((tpls) => [...tpls, template]);
       updateItemsAt(targetDateKey, (its) => [...its, instanceFromTemplate(template)]);
       return;

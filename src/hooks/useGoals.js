@@ -30,7 +30,7 @@ export function useGoals() {
   function addGoal(title, color, deadline) {
     if (!title.trim()) return;
     const id = makeId("g");
-    setGoals((gs) => [...gs, { id, title: title.trim(), color, deadline: deadline || null, milestones: [] }]);
+    setGoals((gs) => [...gs, { id, title: title.trim(), color, createdAt: dateKey(new Date()), deadline: deadline || null, milestones: [] }]);
     setExpanded((e) => ({ ...e, [id]: true }));
     return id;
   }

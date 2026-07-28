@@ -19,6 +19,7 @@ export const seedGoals = [
     id: "g1",
     title: "Land an ML internship",
     color: "#E2661F",
+    createdAt: "2026-06-01",
     deadline: "2026-12-01",
     milestones: [
       { id: "m1", title: "Rebuild resume for ML roles", target: null, progress: 0 },
@@ -30,6 +31,7 @@ export const seedGoals = [
     id: "g2",
     title: "Get stronger in systems",
     color: "#3E5C76",
+    createdAt: "2026-05-01",
     deadline: null,
     milestones: [
       { id: "m4", title: "Finish cache/pipeline review", target: null, progress: 0 },
@@ -40,6 +42,7 @@ export const seedGoals = [
     id: "g3",
     title: "Gain weight (6 months)",
     color: "#C9971F",
+    createdAt: "2026-07-22",
     deadline: "2027-01-22",
     milestones: [
       { id: "m6", title: "Gain 5 lbs this month", target: null, progress: 0 },
@@ -54,6 +57,11 @@ export const seedGoals = [
 
 // Repeatable templates. daysOfWeek uses Date.getDay() values (Sun=0..Sat=6);
 // all seven = daily, a subset = "every Monday and Wednesday" etc.
+//
+// startDate/endDate bound a repeating subtask to the goal it's linked to —
+// a subtask created under a goal only generates from the goal's creation
+// date through its deadline (if it has one), not forever. See
+// useGoals.addGoal / ItemModal / usePlanner.ensureDateRange.
 export const seedTemplates = [
   {
     id: "tpl1",
@@ -65,6 +73,8 @@ export const seedTemplates = [
     milestoneId: "m3",
     contributionAmount: 5, // manual-mode contribution toward m3's remaining target
     daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+    startDate: "2026-06-01", // g1's createdAt
+    endDate: "2026-12-01", // g1's deadline
   },
   {
     id: "tpl2",
@@ -76,6 +86,8 @@ export const seedTemplates = [
     milestoneId: "m7",
     contributionAmount: null, // daily-mode milestone — checking this off is what counts
     daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+    startDate: "2026-07-22", // g3's createdAt
+    endDate: "2027-01-22", // g3's deadline
   },
 ];
 
