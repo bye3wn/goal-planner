@@ -214,7 +214,46 @@ export function usePlanner({ onItemContribution } = {}) {
     updateItemsAt(dateKeyStr, (its) => its.map((i) => (startById.has(i.id) ? { ...i, start: startById.get(i.id) } : i)));
   }
 
-  // schedule: { [dayOfWeek 0-6]: { bedtime: decimalHour|null, wake: decimalHour|null } }
+  // Batch-creates events parsed from an imported .ics file. All-day items
+  // become tasks (they have no specific time, which matches how tasks
+  // already work here); timed items become events, optionally repeating
+  // if the source file had a recurrence pattern simple enough to map onto
+  // daysOfWeek (see utils/icsImport.js for what's supported).
+  function importEvents(parsedEvents) {
+    const newTemplates = [];
+    const byDate = new Map();
+
+    for (const ev of parsedEvents) {
+      if (ev.repeat) {
+        const template = {
+          id: makeId("tpl"), kind: "event", title: ev.title, start: ev.start, duration: ev.duration,
+          goalId: null, milestoneId: null, contributionAmount: null,
+          daysOfWeek: ev.repeat.daysOfWeek, startDate: ev.date, endDate: ev.repeat.endDate || null,
+        };
+        newTemplates.push(template);
+        if (!byDate.has(ev.date)) byDate.set(ev.date, []);
+        byDate.get(ev.date).push(instanceFromTemplate(template));
+      } else {
+        const item = {
+          id: makeId("i"), kind: ev.allDay ? "task" : "event", title: ev.title,
+          start: ev.allDay ? null : ev.start, duration: ev.allDay ? null : ev.duration,
+          goalId: null, milestoneId: null, contributionAmount: null, templateId: null, done: false,
+          linkedTaskIds: ev.allDay ? undefined : [],
+        };
+        if (!byDate.has(ev.date)) byDate.set(ev.date, []);
+        byDate.get(ev.date).push(item);
+      }
+    }
+
+    if (newTemplates.length > 0) setTemplates((tpls) => [...tpls, ...newTemplates]);
+    setItemsByDate((prev) => {
+      const next = { ...prev };
+      for (const [dk, newItems] of byDate.entries()) {
+        next[dk] = [...(next[dk] || []), ...newItems];
+      }
+      return next;
+    });
+  }
   //
   // Bedtime isn't always "in the evening" — a bedtime of 1am or 2am means
   // you're still awake past midnight, so that night's sleep doesn't cross
@@ -304,5 +343,6 @@ export function usePlanner({ onItemContribution } = {}) {
     rescheduleEvents,
     saveSleepSchedule,
     getSleepSchedule,
+    importEvents,
   };
 }

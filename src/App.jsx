@@ -15,6 +15,7 @@ import YearGrid from "./components/planner/YearGrid";
 import TasksPanel from "./components/planner/TasksPanel";
 import ItemModal from "./components/planner/ItemModal";
 import SleepScheduleModal from "./components/planner/SleepScheduleModal";
+import ImportCalendarModal from "./components/planner/ImportCalendarModal";
 
 // This file should stay thin: it connects state (from hooks) to UI (from
 // components) and holds no logic of its own, with three exceptions:
@@ -59,12 +60,14 @@ export default function App() {
     rescheduleEvents,
     saveSleepSchedule,
     getSleepSchedule,
+    importEvents,
   } = usePlanner({ onItemContribution: addMilestoneProgress });
 
   const [itemModal, setItemModal] = useState(null); // null | { initial, targetDateKey }
   const [goalModal, setGoalModal] = useState(null); // null | { initial }
   const [milestoneModal, setMilestoneModal] = useState(null); // null | { goal, initial }
   const [sleepModalOpen, setSleepModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate]);
   const monthGridDates = useMemo(() => getMonthGridDates(currentDate), [currentDate]);
@@ -203,6 +206,7 @@ export default function App() {
         onNext={goToNext}
         onToday={goToToday}
         onOpenSleepSchedule={() => setSleepModalOpen(true)}
+        onOpenImport={() => setImportModalOpen(true)}
       />
 
       <div className="flex flex-1 min-h-0">
@@ -310,6 +314,12 @@ export default function App() {
         initialSchedule={sleepModalOpen ? getSleepSchedule() : {}}
         onSave={saveSleepSchedule}
         onClose={() => setSleepModalOpen(false)}
+      />
+
+      <ImportCalendarModal
+        open={importModalOpen}
+        onImport={importEvents}
+        onClose={() => setImportModalOpen(false)}
       />
     </div>
   );

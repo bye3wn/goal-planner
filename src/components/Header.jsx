@@ -1,5 +1,5 @@
 import React from "react";
-import { Flag, ChevronLeft, ChevronRight, Moon } from "lucide-react";
+import { Flag, ChevronLeft, ChevronRight, Moon, Upload } from "lucide-react";
 import { COLORS, CALENDAR_VIEWS } from "../constants/theme";
 import { formatDateHeading } from "../utils/date";
 import { formatMonthYear, formatWeekRange } from "../utils/calendarRange";
@@ -12,7 +12,7 @@ function rangeLabel(date, view) {
   return "";
 }
 
-export default function Header({ currentDate, view, onSetView, onPrev, onNext, onToday, onOpenSleepSchedule }) {
+export default function Header({ currentDate, view, onSetView, onPrev, onNext, onToday, onOpenSleepSchedule, onOpenImport }) {
   return (
     <header
       className="flex items-center justify-between px-6 py-4 flex-shrink-0 flex-wrap gap-3"
@@ -45,6 +45,15 @@ export default function Header({ currentDate, view, onSetView, onPrev, onNext, o
       </div>
 
       <div className="flex items-center gap-2">
+        <button
+          onClick={onOpenImport}
+          className="p-1.5 rounded-md border hover:bg-black/5 transition-colors"
+          style={{ borderColor: COLORS.line }}
+          title="Import a calendar (.ics)"
+          aria-label="Import a calendar"
+        >
+          <Upload size={16} color={COLORS.inkFaint} />
+        </button>
         <button
           onClick={onOpenSleepSchedule}
           className="p-1.5 rounded-md border hover:bg-black/5 transition-colors"
