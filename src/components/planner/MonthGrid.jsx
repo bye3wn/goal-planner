@@ -6,10 +6,13 @@ import { isToday } from "../../utils/calendarRange";
 const MAX_CHIPS = 3;
 
 // A standard month grid — always 6 full weeks so the layout never jumps
-// between months. Clicking a day's empty space drills into day view for
-// that date (the natural place to add something); clicking an event chip
-// opens it for editing directly, without navigating away.
-export default function MonthGrid({ gridDates, currentMonth, allItems, goalColor, onDayClick, onEventClick }) {
+// between months. Shows each day's TASKS (not timed events — this is
+// meant to answer "what do I need to get done," not "what's my schedule
+// look like," which day/week view already cover), color-coded by
+// long-term goal so a busy month reads at a glance. Clicking a day's empty
+// space drills into day view; clicking a task chip opens it for editing
+// directly, without navigating away.
+export default function MonthGrid({ gridDates, currentMonth, allItems, goalColor, onDayClick, onTaskClick }) {
   const weeks = [];
   for (let i = 0; i < gridDates.length; i += 7) weeks.push(gridDates.slice(i, i + 7));
 
@@ -29,8 +32,8 @@ export default function MonthGrid({ gridDates, currentMonth, allItems, goalColor
             {week.map((d) => {
               const dk = dateKey(d);
               const inMonth = d.getMonth() === currentMonth.getMonth();
-              const dayEvents = allItems.filter((i) => i.date === dk && i.kind === "event").sort((a, b) => a.start - b.start);
-              const overflow = dayEvents.length - MAX_CHIPS;
+              const dayTasks = allItems.filter((i) => i.date === dk && i.kind === "task");
+              const overflow = dayTasks.length - MAX_CHIPS;
 
               return (
                 <button
@@ -46,22 +49,22 @@ export default function MonthGrid({ gridDates, currentMonth, allItems, goalColor
                     {d.getDate()}
                   </span>
                   <div className="flex flex-col gap-0.5">
-                    {dayEvents.slice(0, MAX_CHIPS).map((ev) => (
+                    {dayTasks.slice(0, MAX_CHIPS).map((t) => (
                       <span
-                        key={ev.id}
+                        key={t.id}
                         onClick={(e) => {
                           e.stopPropagation();
-                          onEventClick(ev, d);
+                          onTaskClick(t, d);
                         }}
                         className="text-[10px] truncate px-1 py-0.5 rounded"
                         style={{
-                          background: ev.isSleep ? COLORS.sleep : COLORS.canvas,
-                          color: ev.isSleep ? "#E7E9E3" : COLORS.ink,
-                          borderLeft: `2px solid ${ev.isSleep ? COLORS.sleep : goalColor(ev.goalId)}`,
-                          textDecoration: ev.done && !ev.isSleep ? "line-through" : "none",
+                          background: COLORS.canvas,
+                          color: t.done ? COLORS.inkFaint : COLORS.ink,
+                          borderLeft: `2px solid ${goalColor(t.goalId)}`,
+                          textDecoration: t.done ? "line-through" : "none",
                         }}
                       >
-                        {ev.title}
+                        {t.title}
                       </span>
                     ))}
                     {overflow > 0 && (

@@ -247,13 +247,14 @@ export default function App() {
             allItems={allItems}
             goalColor={goalColor}
             onDayClick={jumpToDay}
-            onEventClick={openEditItem}
+            onTaskClick={openEditItem}
           />
         )}
         {view === "year" && (
           <YearGrid
             yearMonths={yearMonths}
             allItems={allItems}
+            goalColor={goalColor}
             onDayClick={jumpToDay}
             onMonthClick={(m) => jumpToDate(m, "month")}
           />

@@ -1,14 +1,29 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { COLORS, MONTH_LABELS } from "../../constants/theme";
 import { dateKey } from "../../utils/date";
 import { getMonthGridDates, isToday } from "../../utils/calendarRange";
 
-// 12 compact mini-months. Days with anything on them get a small dot —
-// enough to spot a busy stretch at a glance without trying to cram real
-// event titles into a box this small. Click a day to jump to it in day
-// view; click a month name to jump to month view for a closer look.
-export default function YearGrid({ yearMonths, allItems, onDayClick, onMonthClick }) {
-  const busyDates = new Set(allItems.map((i) => i.date));
+const MAX_DOTS = 4;
+
+// 12 compact mini-months. Days with tasks get a small dot per distinct
+// long-term goal that has a task that day — one dot for one goal, several
+// small dots side by side when multiple goals are active the same day, so
+// a busy multi-goal day is visually distinguishable from a single-goal
+// one even at this tiny size. Tasks with no goal attached fall back to a
+// single neutral dot. Click a day to jump to it in day view; click a
+// month name to jump to month view for a closer look.
+export default function YearGrid({ yearMonths, allItems, goalColor, onDayClick, onMonthClick }) {
+  // Precomputed once instead of filtering allItems per day cell (365+
+  // cells x a full item scan each would add up).
+  const goalIdsByDate = useMemo(() => {
+    const map = new Map();
+    for (const i of allItems) {
+      if (i.kind !== "task") continue;
+      if (!map.has(i.date)) map.set(i.date, new Set());
+      map.get(i.date).add(i.goalId || null);
+    }
+    return map;
+  }, [allItems]);
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-5">
@@ -28,7 +43,8 @@ export default function YearGrid({ yearMonths, allItems, onDayClick, onMonthClic
                 {gridDates.map((d) => {
                   const dk = dateKey(d);
                   const inMonth = d.getMonth() === monthStart.getMonth();
-                  const busy = busyDates.has(dk);
+                  const goalIds = Array.from(goalIdsByDate.get(dk) || []).slice(0, MAX_DOTS);
+
                   return (
                     <button
                       key={dk}
@@ -42,10 +58,12 @@ export default function YearGrid({ yearMonths, allItems, onDayClick, onMonthClic
                       >
                         {d.getDate()}
                       </span>
-                      <span
-                        className="w-1 h-1 rounded-full mt-0.5"
-                        style={{ background: busy && inMonth ? COLORS.blaze : "transparent" }}
-                      />
+                      <span className="flex items-center gap-[2px] mt-0.5" style={{ height: 4 }}>
+                        {inMonth &&
+                          goalIds.map((gid, idx) => (
+                            <span key={idx} className="w-1 h-1 rounded-full" style={{ background: goalColor(gid) }} />
+                          ))}
+                      </span>
                     </button>
                   );
                 })}
