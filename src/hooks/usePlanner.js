@@ -17,6 +17,8 @@ function instanceFromTemplate(template) {
     templateId: template.id,
     done: false,
     isSleep: template.isSleep || false,
+    location: template.location || "",
+    description: template.description || "",
     // Which day's tasks to complete during this event — a fresh empty list
     // each day, since which tasks exist that day is different every time a
     // repeating event regenerates.
@@ -132,7 +134,7 @@ export function usePlanner({ onItemContribution } = {}) {
   // a NEW item is created on (ignored when editing — edits stay on the
   // item's existing date).
   function saveItem(payload, editingId, targetDateKey = key) {
-    const { kind, title, start, duration, goalId, milestoneId, contributionAmount, repeat, linkedTaskIds } = payload;
+    const { kind, title, start, duration, goalId, milestoneId, contributionAmount, repeat, linkedTaskIds, location, description } = payload;
     if (!title.trim()) return;
     const daysOfWeek = repeat ? repeat.daysOfWeek : null;
     const bounds = repeat ? { startDate: repeat.startDate || null, endDate: repeat.endDate || null } : {};
@@ -143,8 +145,8 @@ export function usePlanner({ onItemContribution } = {}) {
       if (!dk) return;
       const current = itemsByDate[dk].find((i) => i.id === editingId);
       const wasRepeating = !!current?.templateId;
-      const base = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount, linkedTaskIds: linked };
-      const templateBase = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount };
+      const base = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount, linkedTaskIds: linked, location: location || "", description: description || "" };
+      const templateBase = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount, location: location || "", description: description || "" };
 
       if (daysOfWeek && !wasRepeating) {
         const template = { id: makeId("tpl"), ...templateBase, daysOfWeek, ...bounds };
@@ -165,7 +167,7 @@ export function usePlanner({ onItemContribution } = {}) {
     }
 
     // Creating new
-    const base = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount };
+    const base = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount, location: location || "", description: description || "" };
     if (daysOfWeek) {
       const template = { id: makeId("tpl"), ...base, daysOfWeek, ...bounds };
       setTemplates((tpls) => [...tpls, template]);
@@ -228,6 +230,7 @@ export function usePlanner({ onItemContribution } = {}) {
         const template = {
           id: makeId("tpl"), kind: "event", title: ev.title, start: ev.start, duration: ev.duration,
           goalId: null, milestoneId: null, contributionAmount: null,
+          location: ev.location || "", description: ev.description || "",
           daysOfWeek: ev.repeat.daysOfWeek, startDate: ev.date, endDate: ev.repeat.endDate || null,
         };
         newTemplates.push(template);
@@ -238,6 +241,7 @@ export function usePlanner({ onItemContribution } = {}) {
           id: makeId("i"), kind: ev.allDay ? "task" : "event", title: ev.title,
           start: ev.allDay ? null : ev.start, duration: ev.allDay ? null : ev.duration,
           goalId: null, milestoneId: null, contributionAmount: null, templateId: null, done: false,
+          location: ev.location || "", description: ev.description || "",
           linkedTaskIds: ev.allDay ? undefined : [],
         };
         if (!byDate.has(ev.date)) byDate.set(ev.date, []);

@@ -100,6 +100,8 @@ export function parseICS(text) {
     if (!current) continue;
 
     if (line.name === "SUMMARY") current.title = unescapeText(line.value);
+    else if (line.name === "LOCATION") current.location = unescapeText(line.value);
+    else if (line.name === "DESCRIPTION") current.description = unescapeText(line.value);
     else if (line.name === "DTSTART") current.dtstart = parseDateValue(line.value);
     else if (line.name === "DTEND") current.dtend = parseDateValue(line.value);
     else if (line.name === "DURATION") current.durationHours = parseISODuration(line.value);
@@ -154,6 +156,8 @@ function finalizeEvent(raw) {
     simplified,
     event: {
       title: raw.title,
+      location: raw.location || "",
+      description: raw.description || "",
       date: raw.dtstart.date,
       allDay,
       start: allDay ? null : raw.dtstart.hour,

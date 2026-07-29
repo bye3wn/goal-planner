@@ -97,6 +97,8 @@ export function seedItemsFor(key) {
       id: "i1",
       kind: "event",
       title: "Portfolio project — data cleaning",
+      location: "Home office",
+      description: "Pull the last 5 years of ETF price data and drop anything with gaps.",
       start: 9,
       duration: 2,
       goalId: "g1",

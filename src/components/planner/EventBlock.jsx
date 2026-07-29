@@ -1,5 +1,5 @@
 import React from "react";
-import { Repeat, ListChecks, Moon } from "lucide-react";
+import { Repeat, ListChecks, Moon, MapPin } from "lucide-react";
 import { COLORS, HOUR_HEIGHT_PX } from "../../constants/theme";
 import { formatTime } from "../../utils/date";
 
@@ -54,6 +54,14 @@ export default function EventBlock({ event, color, dayStartHour, isDragging, lin
               <ListChecks size={10} /> {linkedStats.done}/{linkedStats.total}
             </span>
           )}
+        </div>
+      )}
+      {height > 50 && event.location && (
+        <div className="flex items-center gap-1 mt-0.5">
+          <MapPin size={9} color={faintColor} className="flex-shrink-0" />
+          <span className="text-[10px] truncate" style={{ color: faintColor }}>
+            {event.location}
+          </span>
         </div>
       )}
     </div>

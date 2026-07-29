@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { X, Trash2, CalendarClock, ListChecks, Circle, CheckCircle2, ChevronDown } from "lucide-react";
+import { X, Trash2, CalendarClock, ListChecks, Circle, CheckCircle2, ChevronDown, MapPin, AlignLeft } from "lucide-react";
 import { COLORS, TIME_SLOTS, DURATION_OPTIONS, REPEAT_OPTIONS, WEEKDAYS, ALL_WEEKDAYS } from "../../constants/theme";
 import { formatTime, formatDuration } from "../../utils/date";
 
 const EMPTY = {
   kind: "event",
   title: "",
+  location: "",
+  description: "",
   start: 9,
   duration: 1,
   goalId: "",
@@ -87,6 +89,8 @@ export default function ItemModal({ open, initial, goals, dayTasks, onToggleTask
         contributionAmount: isManualCountdown && form.contributionAmount ? Number(form.contributionAmount) : null,
         repeat,
         linkedTaskIds: form.kind === "event" ? form.linkedTaskIds : [],
+        location: form.kind === "event" ? form.location : "",
+        description: form.kind === "event" ? form.description : "",
       },
       initial?.id
     );
@@ -207,6 +211,36 @@ export default function ItemModal({ open, initial, goals, dayTasks, onToggleTask
                 </select>
               </div>
             </div>
+          )}
+
+          {form.kind === "event" && (
+            <>
+              <div>
+                <label className="text-xs font-medium mb-1.5 flex items-center gap-1.5" style={{ color: COLORS.inkFaint }}>
+                  <MapPin size={12} /> Location
+                </label>
+                <input
+                  value={form.location}
+                  onChange={(e) => set({ location: e.target.value })}
+                  placeholder="Add a location"
+                  className="w-full text-sm px-3 py-2 rounded-md border outline-none"
+                  style={{ borderColor: COLORS.line }}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium mb-1.5 flex items-center gap-1.5" style={{ color: COLORS.inkFaint }}>
+                  <AlignLeft size={12} /> Description
+                </label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => set({ description: e.target.value })}
+                  placeholder="Add a description"
+                  rows={3}
+                  className="w-full text-sm px-3 py-2 rounded-md border outline-none resize-none"
+                  style={{ borderColor: COLORS.line }}
+                />
+              </div>
+            </>
           )}
 
           <div className="flex gap-3">
