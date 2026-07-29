@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { X, Trash2, CalendarClock, ListChecks, Circle, CheckCircle2, ChevronDown, MapPin, AlignLeft } from "lucide-react";
-import { COLORS, TIME_SLOTS, DURATION_OPTIONS, REPEAT_OPTIONS, WEEKDAYS, ALL_WEEKDAYS } from "../../constants/theme";
-import { formatTime, formatDuration } from "../../utils/date";
+import { COLORS, REPEAT_OPTIONS, WEEKDAYS, ALL_WEEKDAYS } from "../../constants/theme";
+import TimeInput from "./TimeInput";
 
 const EMPTY = {
   kind: "event",
@@ -9,7 +9,7 @@ const EMPTY = {
   location: "",
   description: "",
   start: 9,
-  duration: 1,
+  end: 10,
   goalId: "",
   milestoneId: "",
   contributionAmount: "",
@@ -32,7 +32,12 @@ export default function ItemModal({ open, initial, goals, dayTasks, onToggleTask
 
   useEffect(() => {
     if (open) {
-      setForm({ ...EMPTY, ...initial, linkedTaskIds: initial?.linkedTaskIds || [] });
+      // The stored model is start+duration; the UI works in start+end (like
+      // Google Calendar), so derive `end` from them when editing. Wraps
+      // past midnight the same way the sleep schedule does — an end time
+      // earlier than the start just means it crosses into the next day.
+      const end = initial?.kind === "event" ? (initial.start + initial.duration) % 24 : EMPTY.end;
+      setForm({ ...EMPTY, ...initial, end, linkedTaskIds: initial?.linkedTaskIds || [] });
       setShowTitleDropdown(false);
     }
   }, [open, initial]);
@@ -78,12 +83,22 @@ export default function ItemModal({ open, initial, goals, dayTasks, onToggleTask
       }
     }
 
+    // The model stores start+duration; the end-time field just makes
+    // entering that easier. An end time at or before the start means it
+    // runs past midnight (e.g. 11pm to 1am), same wraparound as the sleep
+    // schedule.
+    let duration = 1;
+    if (form.kind === "event") {
+      duration = Number(form.end) - Number(form.start);
+      if (duration <= 0) duration += 24;
+    }
+
     onSave(
       {
         kind: form.kind,
         title: form.title,
         start: form.kind === "event" ? Number(form.start) : null,
-        duration: form.kind === "event" ? Number(form.duration) : null,
+        duration: form.kind === "event" ? duration : null,
         goalId: form.goalId || null,
         milestoneId: form.milestoneId || null,
         contributionAmount: isManualCountdown && form.contributionAmount ? Number(form.contributionAmount) : null,
@@ -189,26 +204,12 @@ export default function ItemModal({ open, initial, goals, dayTasks, onToggleTask
           </div>
 
           {form.kind === "event" && (
-            <div className="flex gap-3">
+            <div className="flex items-center gap-3">
               <div className="flex-1">
-                <label className="text-xs font-medium block mb-1.5" style={{ color: COLORS.inkFaint }}>
-                  Start time
-                </label>
-                <select value={form.start} onChange={(e) => set({ start: Number(e.target.value) })} className="w-full text-sm px-3 py-2 rounded-md border outline-none" style={{ borderColor: COLORS.line }}>
-                  {TIME_SLOTS.map((t) => (
-                    <option key={t} value={t}>{formatTime(t)}</option>
-                  ))}
-                </select>
+                <TimeInput label="Start time" value={form.start} onChange={(start) => set({ start })} />
               </div>
               <div className="flex-1">
-                <label className="text-xs font-medium block mb-1.5" style={{ color: COLORS.inkFaint }}>
-                  Duration
-                </label>
-                <select value={form.duration} onChange={(e) => set({ duration: Number(e.target.value) })} className="w-full text-sm px-3 py-2 rounded-md border outline-none" style={{ borderColor: COLORS.line }}>
-                  {DURATION_OPTIONS.map((d) => (
-                    <option key={d} value={d}>{formatDuration(d)}</option>
-                  ))}
-                </select>
+                <TimeInput label="End time" value={form.end} onChange={(end) => set({ end })} />
               </div>
             </div>
           )}

@@ -40,16 +40,6 @@ export const HOURS = Array.from(
 // how long the event actually takes — same idea as Google Calendar.
 export const HOUR_HEIGHT_PX = 52;
 
-// Half-hour time slots across the visible day, used for the start-time
-// picker and for snapping drag-and-drop / click-to-create to the grid.
-export const TIME_SLOTS = Array.from(
-  { length: (DAY_END_HOUR - DAY_START_HOUR) * 4 },
-  (_, i) => DAY_START_HOUR + i * 0.25
-);
-
-// Selectable durations (in hours) when creating/editing an event.
-export const DURATION_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8];
-
 export const REPEAT_OPTIONS = [
   { value: "none", label: "Does not repeat" },
   { value: "daily", label: "Daily" },
