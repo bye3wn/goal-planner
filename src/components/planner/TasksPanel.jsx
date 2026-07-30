@@ -74,7 +74,7 @@ function splitRepeating(taskList) {
 // tasks are grouped underneath — by exact date for week/month (there's
 // only ever a handful of days), by month for year (365 date headers would
 // be unreadable).
-export default function TasksPanel({ view, currentDate, allItems, goalColor, onToggleDone, onTaskClick, onAddTask, onJumpToDay }) {
+export default function TasksPanel({ view, currentDate, allItems, goalColor, onToggleDone, onTaskClick, onAddTask, onJumpToDay, fullWidth }) {
   const dayKey = dateKey(currentDate);
   const allTasks = useMemo(() => allItems.filter((i) => i.kind === "task"), [allItems]);
   const dayList = useMemo(() => allTasks.filter((t) => t.date === dayKey), [allTasks, dayKey]);
@@ -108,7 +108,7 @@ export default function TasksPanel({ view, currentDate, allItems, goalColor, onT
   }, [view, currentDate, allTasks]);
 
   return (
-    <aside className="w-[280px] flex-shrink-0 overflow-y-auto px-5 py-5" style={{ borderLeft: `1px solid ${COLORS.line}` }}>
+    <aside className={`${fullWidth ? "w-full" : "w-[280px] flex-shrink-0"} overflow-y-auto px-5 py-5`} style={{ borderLeft: fullWidth ? "none" : `1px solid ${COLORS.line}` }}>
       <div className="flex items-center justify-between mb-3">
         <h2 className="font-display text-sm tracking-wide uppercase" style={{ color: COLORS.inkFaint }}>
           Tasks

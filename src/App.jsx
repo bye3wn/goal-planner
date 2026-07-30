@@ -4,6 +4,7 @@ import { daysBetween, dateKey } from "./utils/date";
 import { getWeekDates, getMonthGridDates, getMonthDates, getYearMonths } from "./utils/calendarRange";
 import { useGoals } from "./hooks/useGoals";
 import { usePlanner } from "./hooks/usePlanner";
+import { useIsMobile } from "./hooks/useIsMobile";
 import Header from "./components/Header";
 import Sidebar from "./components/sidebar/Sidebar";
 import GoalModal from "./components/sidebar/GoalModal";
@@ -16,6 +17,7 @@ import TasksPanel from "./components/planner/TasksPanel";
 import ItemModal from "./components/planner/ItemModal";
 import SleepScheduleModal from "./components/planner/SleepScheduleModal";
 import ImportCalendarModal from "./components/planner/ImportCalendarModal";
+import MobileLayout from "./components/mobile/MobileLayout";
 
 // This file should stay thin: it connects state (from hooks) to UI (from
 // components) and holds no logic of its own, with three exceptions:
@@ -189,6 +191,18 @@ export default function App() {
     ? allItems.filter((i) => i.kind === "task" && i.date === itemModal.targetDateKey)
     : [];
 
+  const isMobile = useIsMobile();
+
+  // The mobile floating add button doesn't have a clicked grid slot to
+  // work from the way desktop's click-to-create does, so it defaults to
+  // the current real-world hour (rounded to the nearest 15 min), on
+  // whichever date is currently focused.
+  function handleQuickAddEvent() {
+    const now = new Date();
+    const roughHour = Math.round((now.getHours() + now.getMinutes() / 60) * 4) / 4;
+    openCreateEvent(roughHour, dateKey(currentDate));
+  }
+
   return (
     <div style={{ background: COLORS.canvas, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }} className="w-full min-h-screen flex flex-col">
       <style>{`
@@ -207,14 +221,33 @@ export default function App() {
         onToday={goToToday}
         onOpenSleepSchedule={() => setSleepModalOpen(true)}
         onOpenImport={() => setImportModalOpen(true)}
+        compact={isMobile}
       />
 
-      <div className="flex flex-1 min-h-0">
-        <Sidebar
+      {isMobile ? (
+        <MobileLayout
+          view={view}
+          setView={setView}
+          currentDate={currentDate}
+          goToPrev={goToPrev}
+          goToNext={goToNext}
+          goToToday={goToToday}
+          jumpToDate={jumpToDate}
+          events={events}
+          dayTasksForCalendar={tasks}
+          goalColor={goalColor}
+          onRescheduleEvents={rescheduleEvents}
+          onSlotClick={(hourOrDate, maybeHour) =>
+            maybeHour !== undefined ? openCreateEvent(maybeHour, dateKey(hourOrDate)) : openCreateEvent(hourOrDate)
+          }
+          onEventClick={openEditItem}
+          weekDates={weekDates}
+          monthGridDates={monthGridDates}
+          yearMonths={yearMonths}
+          allItems={allItems}
           goals={goals}
           expanded={expanded}
           milestoneStats={milestoneStats}
-          allItems={allItems}
           rangeDateKeys={milestoneRangeKeys}
           onToggleExpanded={toggleExpanded}
           onAddGoalClick={openAddGoal}
@@ -222,59 +255,81 @@ export default function App() {
           onAddMilestone={openAddMilestone}
           onMilestoneClick={openEditMilestone}
           onToggleSubtaskDone={toggleItemDone}
-        />
-
-        {view === "day" && (
-          <CalendarGrid
-            events={events}
-            dayTasks={tasks}
-            goalColor={goalColor}
-            onRescheduleEvents={rescheduleEvents}
-            onSlotClick={openCreateEvent}
-            onEventClick={openEditItem}
-          />
-        )}
-        {view === "week" && (
-          <WeekGrid
-            weekDates={weekDates}
-            allItems={allItems}
-            goalColor={goalColor}
-            onSlotClick={(date, hour) => openCreateEvent(hour, dateKey(date))}
-            onEventClick={openEditItem}
-            onDayHeaderClick={jumpToDay}
-          />
-        )}
-        {view === "month" && (
-          <MonthGrid
-            gridDates={monthGridDates}
-            currentMonth={currentDate}
-            allItems={allItems}
-            goalColor={goalColor}
-            onDayClick={jumpToDay}
-            onTaskClick={openEditItem}
-          />
-        )}
-        {view === "year" && (
-          <YearGrid
-            yearMonths={yearMonths}
-            allItems={allItems}
-            goalColor={goalColor}
-            onDayClick={jumpToDay}
-            onMonthClick={(m) => jumpToDate(m, "month")}
-          />
-        )}
-
-        <TasksPanel
-          view={view}
-          currentDate={currentDate}
-          allItems={allItems}
-          goalColor={goalColor}
+          tasks={tasks}
           onToggleDone={toggleItemDone}
           onTaskClick={openEditItem}
           onAddTask={openCreateTask}
           onJumpToDay={jumpToDay}
+          onQuickAddEvent={handleQuickAddEvent}
         />
-      </div>
+      ) : (
+        <div className="flex flex-1 min-h-0">
+          <Sidebar
+            goals={goals}
+            expanded={expanded}
+            milestoneStats={milestoneStats}
+            allItems={allItems}
+            rangeDateKeys={milestoneRangeKeys}
+            onToggleExpanded={toggleExpanded}
+            onAddGoalClick={openAddGoal}
+            onEditGoal={openEditGoal}
+            onAddMilestone={openAddMilestone}
+            onMilestoneClick={openEditMilestone}
+            onToggleSubtaskDone={toggleItemDone}
+          />
+
+          {view === "day" && (
+            <CalendarGrid
+              events={events}
+              dayTasks={tasks}
+              goalColor={goalColor}
+              onRescheduleEvents={rescheduleEvents}
+              onSlotClick={openCreateEvent}
+              onEventClick={openEditItem}
+            />
+          )}
+          {view === "week" && (
+            <WeekGrid
+              weekDates={weekDates}
+              allItems={allItems}
+              goalColor={goalColor}
+              onSlotClick={(date, hour) => openCreateEvent(hour, dateKey(date))}
+              onEventClick={openEditItem}
+              onDayHeaderClick={jumpToDay}
+            />
+          )}
+          {view === "month" && (
+            <MonthGrid
+              gridDates={monthGridDates}
+              currentMonth={currentDate}
+              allItems={allItems}
+              goalColor={goalColor}
+              onDayClick={jumpToDay}
+              onTaskClick={openEditItem}
+            />
+          )}
+          {view === "year" && (
+            <YearGrid
+              yearMonths={yearMonths}
+              allItems={allItems}
+              goalColor={goalColor}
+              onDayClick={jumpToDay}
+              onMonthClick={(m) => jumpToDate(m, "month")}
+            />
+          )}
+
+          <TasksPanel
+            view={view}
+            currentDate={currentDate}
+            allItems={allItems}
+            goalColor={goalColor}
+            onToggleDone={toggleItemDone}
+            onTaskClick={openEditItem}
+            onAddTask={openCreateTask}
+            onJumpToDay={jumpToDay}
+          />
+        </div>
+      )}
 
       <ItemModal
         open={!!itemModal}
