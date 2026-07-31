@@ -96,7 +96,7 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
   }
 
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-5">
+    <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
       <div className="max-w-2xl flex">
         {/* Hour labels */}
         <div className="w-16 flex-shrink-0" style={{ height: gridHeight }}>

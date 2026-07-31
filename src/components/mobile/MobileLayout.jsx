@@ -65,7 +65,7 @@ export default function MobileLayout(props) {
               ))}
             </div>
 
-            <div className="flex-1 min-h-0 relative">
+            <div className="flex-1 min-h-0 relative flex flex-col">
               {view === "day" && (
                 <CalendarGrid
                   events={events}

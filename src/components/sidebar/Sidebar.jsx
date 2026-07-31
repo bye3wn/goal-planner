@@ -6,7 +6,7 @@ import GoalRow from "./GoalRow";
 export default function Sidebar({ goals, expanded, milestoneStats, allItems, rangeDateKeys, onToggleExpanded, onAddGoalClick, onEditGoal, onAddMilestone, onMilestoneClick, onToggleSubtaskDone, fullWidth }) {
   return (
     <aside
-      className={`${fullWidth ? "w-full" : "w-[320px] flex-shrink-0"} overflow-y-auto px-5 py-5`}
+      className={`${fullWidth ? "w-full flex-1 min-h-0" : "w-[320px] flex-shrink-0"} overflow-y-auto px-5 py-5`}
       style={{ borderRight: fullWidth ? "none" : `1px solid ${COLORS.line}`, background: COLORS.panel }}
     >
       <div className="flex items-center justify-between mb-4">

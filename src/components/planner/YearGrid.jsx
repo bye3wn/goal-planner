@@ -26,7 +26,7 @@ export default function YearGrid({ yearMonths, allItems, goalColor, onDayClick, 
   }, [allItems]);
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-5">
+    <div className="flex-1 min-h-0 overflow-y-auto px-4 py-5">
       <div className="grid grid-cols-3 gap-6">
         {yearMonths.map((monthStart) => {
           const gridDates = getMonthGridDates(monthStart);

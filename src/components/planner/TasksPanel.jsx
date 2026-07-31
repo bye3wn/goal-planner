@@ -108,7 +108,7 @@ export default function TasksPanel({ view, currentDate, allItems, goalColor, onT
   }, [view, currentDate, allTasks]);
 
   return (
-    <aside className={`${fullWidth ? "w-full" : "w-[280px] flex-shrink-0"} overflow-y-auto px-5 py-5`} style={{ borderLeft: fullWidth ? "none" : `1px solid ${COLORS.line}` }}>
+    <aside className={`${fullWidth ? "w-full flex-1 min-h-0" : "w-[280px] flex-shrink-0"} overflow-y-auto px-5 py-5`} style={{ borderLeft: fullWidth ? "none" : `1px solid ${COLORS.line}` }}>
       <div className="flex items-center justify-between mb-3">
         <h2 className="font-display text-sm tracking-wide uppercase" style={{ color: COLORS.inkFaint }}>
           Tasks
