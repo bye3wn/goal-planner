@@ -2,8 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Keeps content clear of the notch/home-indicator when installed as an app */
+/* Locks the page to exactly the visible viewport so nothing but the
+   designated scroll containers inside the app (the calendar grid, the
+   goals list, the tasks panel) ever scrolls — otherwise, on a long tab,
+   the whole page (including the fixed bottom tab bar on mobile) would
+   scroll as one unit and the tab bar would appear to move. 100dvh
+   (dynamic viewport height) instead of 100vh avoids the extra jump that
+   happens on mobile browsers when the address bar shows/hides. */
+html, body {
+  height: 100%;
+  height: 100dvh;
+  margin: 0;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+}
+
+/* Keeps content clear of the notch/home-indicator when installed as an
+   app. box-sizing: border-box means this padding is carved out of the
+   locked height above rather than added on top of it — padding that adds
+   height is exactly what would cause the page to scroll again. */
 body {
+  box-sizing: border-box;
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }

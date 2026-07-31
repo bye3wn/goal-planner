@@ -204,7 +204,10 @@ export default function App() {
   }
 
   return (
-    <div style={{ background: COLORS.canvas, color: COLORS.ink, fontFamily: "'Inter', sans-serif" }} className="w-full min-h-screen flex flex-col">
+    <div
+      style={{ background: COLORS.canvas, color: COLORS.ink, fontFamily: "'Inter', sans-serif", height: "100%" }}
+      className="w-full overflow-hidden flex flex-col"
+    >
       <style>{`
         @import url('${FONT_IMPORT_URL}');
         .font-display { font-family: 'Fraunces', serif; }
