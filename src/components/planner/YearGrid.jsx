@@ -3,15 +3,15 @@ import { COLORS, MONTH_LABELS } from "../../constants/theme";
 import { dateKey } from "../../utils/date";
 import { getMonthGridDates, isToday } from "../../utils/calendarRange";
 
-const MAX_DOTS = 4;
-
-// 12 compact mini-months. Days with tasks get a small dot per distinct
-// long-term goal that has a task that day — one dot for one goal, several
-// small dots side by side when multiple goals are active the same day, so
-// a busy multi-goal day is visually distinguishable from a single-goal
-// one even at this tiny size. Tasks with no goal attached fall back to a
-// single neutral dot. Click a day to jump to it in day view; click a
-// month name to jump to month view for a closer look.
+// 12 compact mini-months. A day with any tasks gets a single dot, colored
+// by whichever goal comes first for that day — and if more than one goal
+// is active that day, a small "+N" next to it for the rest, rather than
+// stacking a dot per goal. Stacked dots overlapped once a day had 3+ goals
+// (worse on narrow phone widths, but desktop hit the same wall around 4) —
+// a fixed dot-plus-count reads clearly at any width, however many goals
+// pile onto one day. Tasks with no goal attached count as a neutral dot.
+// Click a day to jump to it in day view; click a month name to jump to
+// month view for a closer look.
 export default function YearGrid({ yearMonths, allItems, goalColor, onDayClick, onMonthClick }) {
   // Precomputed once instead of filtering allItems per day cell (365+
   // cells x a full item scan each would add up).
@@ -43,7 +43,8 @@ export default function YearGrid({ yearMonths, allItems, goalColor, onDayClick, 
                 {gridDates.map((d) => {
                   const dk = dateKey(d);
                   const inMonth = d.getMonth() === monthStart.getMonth();
-                  const goalIds = Array.from(goalIdsByDate.get(dk) || []).slice(0, MAX_DOTS);
+                  const goalIds = Array.from(goalIdsByDate.get(dk) || []);
+                  const extra = goalIds.length - 1;
 
                   return (
                     <button
@@ -58,11 +59,17 @@ export default function YearGrid({ yearMonths, allItems, goalColor, onDayClick, 
                       >
                         {d.getDate()}
                       </span>
-                      <span className="flex items-center gap-[2px] mt-0.5" style={{ height: 4 }}>
-                        {inMonth &&
-                          goalIds.map((gid, idx) => (
-                            <span key={idx} className="w-1 h-1 rounded-full" style={{ background: goalColor(gid) }} />
-                          ))}
+                      <span className="flex items-center justify-center gap-0.5 mt-0.5" style={{ height: 8 }}>
+                        {inMonth && goalIds.length > 0 && (
+                          <>
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: goalColor(goalIds[0]) }} />
+                            {extra > 0 && (
+                              <span className="text-[7px] font-mono leading-none" style={{ color: COLORS.inkFaint }}>
+                                +{extra}
+                              </span>
+                            )}
+                          </>
+                        )}
                       </span>
                     </button>
                   );
