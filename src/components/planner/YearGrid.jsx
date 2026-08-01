@@ -3,13 +3,30 @@ import { COLORS, MONTH_LABELS } from "../../constants/theme";
 import { dateKey } from "../../utils/date";
 import { getMonthGridDates, isToday } from "../../utils/calendarRange";
 
-// 12 compact mini-months. A day with any tasks gets a single dot, colored
-// by whichever goal comes first for that day — and if more than one goal
-// is active that day, a small "+N" next to it for the rest, rather than
-// stacking a dot per goal. Stacked dots overlapped once a day had 3+ goals
-// (worse on narrow phone widths, but desktop hit the same wall around 4) —
-// a fixed dot-plus-count reads clearly at any width, however many goals
-// pile onto one day. Tasks with no goal attached count as a neutral dot.
+// Builds the CSS background for one day's dot: a solid color for a single
+// goal, a conic-gradient sliced into even wedges for 2-4 goals (a real
+// pie chart, not stacked dots — nothing to overlap regardless of screen
+// width), and a fixed rainbow gradient for 5+ (past 4 there's no useful
+// way to keep slices individually readable at this size, so it just signals
+// "a lot going on" rather than trying to represent each one).
+function dotBackground(goalIds, goalColor) {
+  const colors = goalIds.map((id) => goalColor(id));
+  if (colors.length === 0) return null;
+  if (colors.length === 1) return colors[0];
+  if (colors.length <= 4) {
+    const slice = 360 / colors.length;
+    const stops = colors.map((c, i) => `${c} ${i * slice}deg ${(i + 1) * slice}deg`).join(", ");
+    return `conic-gradient(${stops})`;
+  }
+  return "conic-gradient(red, orange, yellow, green, blue, indigo, violet, red)";
+}
+
+// 12 compact mini-months. A day with any tasks gets a small dot — solid if
+// only one goal is active that day, split into pie-chart wedges (one per
+// goal, up to 4) if several are, and a rainbow dot beyond that. This reads
+// clearly at any width, since it's always exactly one small circle no
+// matter how many goals land on the same day — nothing to overlap the way
+// stacked dots did. Tasks with no goal attached count as a neutral wedge.
 // Click a day to jump to it in day view; click a month name to jump to
 // month view for a closer look.
 export default function YearGrid({ yearMonths, allItems, goalColor, onDayClick, onMonthClick }) {
@@ -44,7 +61,7 @@ export default function YearGrid({ yearMonths, allItems, goalColor, onDayClick, 
                   const dk = dateKey(d);
                   const inMonth = d.getMonth() === monthStart.getMonth();
                   const goalIds = Array.from(goalIdsByDate.get(dk) || []);
-                  const extra = goalIds.length - 1;
+                  const background = inMonth ? dotBackground(goalIds, goalColor) : null;
 
                   return (
                     <button
@@ -59,17 +76,8 @@ export default function YearGrid({ yearMonths, allItems, goalColor, onDayClick, 
                       >
                         {d.getDate()}
                       </span>
-                      <span className="flex items-center justify-center gap-0.5 mt-0.5" style={{ height: 8 }}>
-                        {inMonth && goalIds.length > 0 && (
-                          <>
-                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: goalColor(goalIds[0]) }} />
-                            {extra > 0 && (
-                              <span className="text-[7px] font-mono leading-none" style={{ color: COLORS.inkFaint }}>
-                                +{extra}
-                              </span>
-                            )}
-                          </>
-                        )}
+                      <span className="flex items-center justify-center mt-0.5" style={{ height: 8 }}>
+                        {background && <span className="w-[7px] h-[7px] rounded-full flex-shrink-0" style={{ background }} />}
                       </span>
                     </button>
                   );
