@@ -308,7 +308,6 @@ export default function App() {
               allItems={allItems}
               goalColor={goalColor}
               onDayClick={jumpToDay}
-              onTaskClick={openEditItem}
             />
           )}
           {view === "year" && (

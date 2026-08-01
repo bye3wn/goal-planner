@@ -9,10 +9,11 @@ const MAX_CHIPS = 3;
 // between months. Shows each day's TASKS (not timed events — this is
 // meant to answer "what do I need to get done," not "what's my schedule
 // look like," which day/week view already cover), color-coded by
-// long-term goal so a busy month reads at a glance. Clicking a day's empty
-// space drills into day view; clicking a task chip opens it for editing
-// directly, without navigating away.
-export default function MonthGrid({ gridDates, currentMonth, allItems, goalColor, onDayClick, onTaskClick }) {
+// long-term goal so a busy month reads at a glance. Clicking anywhere in a
+// day's cell — the empty space or a task chip — drills into day view for
+// that date, rather than popping open an edit box while you're still
+// looking at the month.
+export default function MonthGrid({ gridDates, currentMonth, allItems, goalColor, onDayClick }) {
   const weeks = [];
   for (let i = 0; i < gridDates.length; i += 7) weeks.push(gridDates.slice(i, i + 7));
 
@@ -52,10 +53,6 @@ export default function MonthGrid({ gridDates, currentMonth, allItems, goalColor
                     {dayTasks.slice(0, MAX_CHIPS).map((t) => (
                       <span
                         key={t.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onTaskClick(t, d);
-                        }}
                         className="text-[10px] truncate px-1 py-0.5 rounded"
                         style={{
                           background: COLORS.canvas,

@@ -93,7 +93,6 @@ export default function MobileLayout(props) {
                   allItems={allItems}
                   goalColor={goalColor}
                   onDayClick={(d) => jumpToDate(d, "day")}
-                  onTaskClick={onEventClick}
                 />
               )}
               {view === "year" && (
