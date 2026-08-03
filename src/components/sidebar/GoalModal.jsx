@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { X, Trash2 } from "lucide-react";
+import { X, Trash2, Palette } from "lucide-react";
 import { COLORS, GOAL_PALETTE } from "../../constants/theme";
+import ColorPicker from "./ColorPicker";
 
 const EMPTY = { title: "", color: GOAL_PALETTE[0].hex, deadline: "" };
 
@@ -10,10 +11,15 @@ const EMPTY = { title: "", color: GOAL_PALETTE[0].hex, deadline: "" };
 // "daily until deadline" percentage mode.
 export default function GoalModal({ open, initial, onSave, onDelete, onClose }) {
   const [form, setForm] = useState(EMPTY);
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setForm(initial?.id ? { title: initial.title, color: initial.color, deadline: initial.deadline || "" } : EMPTY);
+      const color = initial?.id ? initial.color : EMPTY.color;
+      setForm(initial?.id ? { title: initial.title, color, deadline: initial.deadline || "" } : EMPTY);
+      // If the goal's saved color isn't one of the presets, it was picked
+      // with the custom slider — open straight to it so it's not hidden.
+      setShowCustomPicker(!GOAL_PALETTE.some((c) => c.hex.toLowerCase() === color.toLowerCase()));
     }
   }, [open, initial]);
 
@@ -57,7 +63,7 @@ export default function GoalModal({ open, initial, onSave, onDelete, onClose }) 
             <label className="text-xs font-medium block mb-1.5" style={{ color: COLORS.inkFaint }}>
               Color
             </label>
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5 mb-2">
               {GOAL_PALETTE.map((c) => (
                 <button
                   key={c.hex}
@@ -65,9 +71,28 @@ export default function GoalModal({ open, initial, onSave, onDelete, onClose }) 
                   className="w-6 h-6 rounded-full flex-shrink-0"
                   style={{ background: c.hex, outline: form.color === c.hex ? `2px solid ${COLORS.ink}` : "none", outlineOffset: "2px" }}
                   aria-label={c.name}
+                  title={c.name}
                 />
               ))}
+              <button
+                onClick={() => setShowCustomPicker((o) => !o)}
+                className="w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center"
+                style={{
+                  background: showCustomPicker ? COLORS.ink : COLORS.canvas,
+                  outline: showCustomPicker ? `2px solid ${COLORS.ink}` : `1px solid ${COLORS.line}`,
+                  outlineOffset: showCustomPicker ? "2px" : "0",
+                }}
+                aria-label="Custom color"
+                title="Custom color"
+              >
+                <Palette size={12} color={showCustomPicker ? "#fff" : COLORS.inkFaint} />
+              </button>
             </div>
+            {showCustomPicker && (
+              <div className="p-3 rounded-md" style={{ background: COLORS.canvas }}>
+                <ColorPicker value={form.color} onChange={(color) => set({ color })} />
+              </div>
+            )}
           </div>
 
           <div>

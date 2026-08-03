@@ -16,6 +16,9 @@ export const COLORS = {
 
 // Selectable colors when creating a new goal. Add/remove entries here to
 // change what shows up in the color picker.
+// Selectable colors when creating a new goal. Add/remove entries here to
+// change what shows up in the preset picker — there's also a full custom
+// slider picker (see ColorPicker.jsx) for anything not covered here.
 export const GOAL_PALETTE = [
   { name: "Blaze", hex: "#E2661F" },
   { name: "Forest", hex: "#1F3D2E" },
@@ -23,6 +26,16 @@ export const GOAL_PALETTE = [
   { name: "Plum", hex: "#6B4A73" },
   { name: "Ochre", hex: "#C9971F" },
   { name: "Slate", hex: "#3E5C76" },
+  { name: "Crimson", hex: "#B23A48" },
+  { name: "Moss", hex: "#5C7A4A" },
+  { name: "Indigo", hex: "#4B4E8C" },
+  { name: "Terracotta", hex: "#C1673B" },
+  { name: "Rose", hex: "#B85C7A" },
+  { name: "Steel", hex: "#5A6B72" },
+  { name: "Amber", hex: "#D4A24C" },
+  { name: "Sage", hex: "#7A8C6E" },
+  { name: "Wine", hex: "#7A3B4A" },
+  { name: "Denim", hex: "#3E6B8C" },
 ];
 
 // The visible hours in the day planner — now the full day. Day view
