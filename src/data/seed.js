@@ -91,6 +91,17 @@ export const seedTemplates = [
   },
 ];
 
+// Pre-made events for the week view's drag-and-drop list — reusable
+// blueprints (title/duration/goal) with no date of their own. Dragging one
+// onto the week grid stamps out a real event instance at the drop target
+// via usePlanner.createEventFromPreset; the preset itself is untouched, so
+// it can be dragged out again for the next day.
+export const seedPresets = [
+  { id: "preset1", title: "Gym", duration: 1, goalId: null },
+  { id: "preset2", title: "Deep work block", duration: 2, goalId: "g1" },
+  { id: "preset3", title: "Reading", duration: 1, goalId: "g2" },
+];
+
 export function seedItemsFor(key) {
   return [
     {

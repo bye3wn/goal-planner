@@ -14,6 +14,7 @@ import WeekGrid from "./components/planner/WeekGrid";
 import MonthGrid from "./components/planner/MonthGrid";
 import YearGrid from "./components/planner/YearGrid";
 import TasksPanel from "./components/planner/TasksPanel";
+import EventPresetsPanel from "./components/planner/EventPresetsPanel";
 import ItemModal from "./components/planner/ItemModal";
 import SleepScheduleModal from "./components/planner/SleepScheduleModal";
 import ImportCalendarModal from "./components/planner/ImportCalendarModal";
@@ -63,6 +64,12 @@ export default function App() {
     saveSleepSchedule,
     getSleepSchedule,
     importEvents,
+    presets,
+    addPreset,
+    deletePreset,
+    createEventFromPreset,
+    moveEvent,
+    swapEvents,
   } = usePlanner({ onItemContribution: addMilestoneProgress });
 
   const [itemModal, setItemModal] = useState(null); // null | { initial, targetDateKey }
@@ -187,6 +194,11 @@ export default function App() {
     jumpToDate(date, "day");
   }
 
+  function handleDropPreset(presetId, targetDateKey, start) {
+    const preset = presets.find((p) => p.id === presetId);
+    if (preset) createEventFromPreset(preset, targetDateKey, start);
+  }
+
   const dayTasksForModal = itemModal
     ? allItems.filter((i) => i.kind === "task" && i.date === itemModal.targetDateKey)
     : [];
@@ -299,7 +311,13 @@ export default function App() {
               onSlotClick={(date, hour) => openCreateEvent(hour, dateKey(date))}
               onEventClick={openEditItem}
               onDayHeaderClick={jumpToDay}
+              onDropPreset={handleDropPreset}
+              onMoveEvent={moveEvent}
+              onSwapEvents={swapEvents}
             />
+          )}
+          {view === "week" && (
+            <EventPresetsPanel presets={presets} goals={goals} goalColor={goalColor} onAddPreset={addPreset} onDeletePreset={deletePreset} />
           )}
           {view === "month" && (
             <MonthGrid

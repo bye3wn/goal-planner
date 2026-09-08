@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { seedItemsFor, seedTemplates } from "../data/seed";
+import { seedItemsFor, seedTemplates, seedPresets } from "../data/seed";
 import { dateKey } from "../utils/date";
 import { getViewDateKeys, shiftByView } from "../utils/calendarRange";
 import { makeId } from "../utils/id";
@@ -46,6 +46,7 @@ export function usePlanner({ onItemContribution } = {}) {
   const key = dateKey(currentDate);
 
   const [templates, setTemplates] = useState(seedTemplates);
+  const [presets, setPresets] = useState(seedPresets);
   const [itemsByDate, setItemsByDate] = useState(() => ({
     [key]: [...seedItemsFor(key), ...seedTemplates.map(instanceFromTemplate)],
   }));
@@ -216,6 +217,86 @@ export function usePlanner({ onItemContribution } = {}) {
     updateItemsAt(dateKeyStr, (its) => its.map((i) => (startById.has(i.id) ? { ...i, start: startById.get(i.id) } : i)));
   }
 
+  // Pre-made events for the week view's drag-and-drop list. A preset has no
+  // date of its own — dragging it onto the grid stamps out a real event via
+  // createEventFromPreset, leaving the preset itself reusable.
+  function addPreset(title, duration, goalId) {
+    if (!title.trim()) return;
+    setPresets((ps) => [...ps, { id: makeId("preset"), title: title.trim(), duration, goalId: goalId || null }]);
+  }
+  function deletePreset(id) {
+    setPresets((ps) => ps.filter((p) => p.id !== id));
+  }
+  function createEventFromPreset(preset, toDateKey, start) {
+    updateItemsAt(toDateKey, (its) => [
+      ...its,
+      {
+        id: makeId("i"),
+        kind: "event",
+        title: preset.title,
+        start,
+        duration: preset.duration,
+        goalId: preset.goalId,
+        milestoneId: null,
+        contributionAmount: null,
+        templateId: null,
+        done: false,
+        linkedTaskIds: [],
+        location: "",
+        description: "",
+      },
+    ]);
+  }
+
+  // Drags an existing event to a new day/time in the week grid (no swap —
+  // the target slot is empty). Cross-day moves splice the item out of its
+  // old date's array and into the new one; same-day moves just update start.
+  function moveEvent(id, toDateKey, newStart) {
+    const dk = findDateKeyOf(id);
+    if (!dk) return;
+    if (dk === toDateKey) {
+      updateItemsAt(dk, (its) => its.map((i) => (i.id === id ? { ...i, start: newStart } : i)));
+      return;
+    }
+    const item = itemsByDate[dk].find((i) => i.id === id);
+    if (!item) return;
+    setItemsByDate((prev) => ({
+      ...prev,
+      [dk]: prev[dk].filter((i) => i.id !== id),
+      [toDateKey]: [...(prev[toDateKey] || []), { ...item, start: newStart }],
+    }));
+  }
+
+  // Dragging one event onto another trades their day+time outright: each
+  // event ends up exactly where the other one was, identity (id, title,
+  // goal, etc.) untouched — a true swap rather than a push/overlap.
+  function swapEvents(idA, idB) {
+    if (idA === idB) return;
+    const dkA = findDateKeyOf(idA);
+    const dkB = findDateKeyOf(idB);
+    if (!dkA || !dkB) return;
+    const a = itemsByDate[dkA].find((i) => i.id === idA);
+    const b = itemsByDate[dkB].find((i) => i.id === idB);
+    if (!a || !b) return;
+
+    if (dkA === dkB) {
+      updateItemsAt(dkA, (its) =>
+        its.map((i) => {
+          if (i.id === idA) return { ...i, start: b.start };
+          if (i.id === idB) return { ...i, start: a.start };
+          return i;
+        })
+      );
+      return;
+    }
+
+    setItemsByDate((prev) => ({
+      ...prev,
+      [dkA]: prev[dkA].map((i) => (i.id === idA ? { ...b, start: a.start } : i)),
+      [dkB]: prev[dkB].map((i) => (i.id === idB ? { ...a, start: b.start } : i)),
+    }));
+  }
+
   // Batch-creates events parsed from an imported .ics file. All-day items
   // become tasks (they have no specific time, which matches how tasks
   // already work here); timed items become events, optionally repeating
@@ -348,5 +429,11 @@ export function usePlanner({ onItemContribution } = {}) {
     saveSleepSchedule,
     getSleepSchedule,
     importEvents,
+    presets,
+    addPreset,
+    deletePreset,
+    createEventFromPreset,
+    moveEvent,
+    swapEvents,
   };
 }
