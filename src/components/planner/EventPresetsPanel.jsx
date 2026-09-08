@@ -1,27 +1,36 @@
 import React, { useState } from "react";
-import { Plus, X, GripVertical } from "lucide-react";
+import { Plus, X, GripVertical, Lock } from "lucide-react";
 import { COLORS } from "../../constants/theme";
 import { formatDuration } from "../../utils/date";
 
 // One draggable pre-made event. Grabbing it and dropping it on the week
 // grid (see WeekGrid's onDropPreset) stamps out a real event instance
 // there — the preset itself stays in this list so it can be reused for
-// other days.
-function PresetCard({ preset, color, onDelete }) {
+// other days. onDragStart/onDragEnd bubble the preset up to App so
+// WeekGrid (a sibling, not a descendant of this panel) knows what's being
+// dragged and can render a live preview — dataTransfer's payload isn't
+// readable during dragover, only at drop, so that's carried as plain
+// component state instead.
+function PresetCard({ preset, color, onDelete, onDragStart, onDragEnd }) {
   return (
     <div
       draggable
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "copy";
         e.dataTransfer.setData("application/json", JSON.stringify({ type: "preset", presetId: preset.id }));
+        onDragStart(preset);
       }}
+      onDragEnd={onDragEnd}
       className="group flex items-center gap-1.5 px-2 py-1.5 rounded-md border cursor-grab active:cursor-grabbing"
       style={{ borderColor: COLORS.line, borderLeft: `3px solid ${color}`, background: COLORS.panel }}
       title="Drag onto the week grid to schedule it"
     >
       <GripVertical size={12} color={COLORS.inkFaint} className="flex-shrink-0" />
       <div className="flex-1 min-w-0">
-        <div className="text-xs font-medium truncate">{preset.title}</div>
+        <div className="flex items-center gap-1">
+          <span className="text-xs font-medium truncate">{preset.title}</span>
+          {preset.locked && <Lock size={9} color={COLORS.inkFaint} className="flex-shrink-0" />}
+        </div>
         <div className="font-mono text-[10px]" style={{ color: COLORS.inkFaint }}>
           {formatDuration(preset.duration)}
         </div>
@@ -41,11 +50,12 @@ function AddPresetForm({ goals, onSubmit, onCancel }) {
   const [title, setTitle] = useState("");
   const [duration, setDuration] = useState("1");
   const [goalId, setGoalId] = useState("");
+  const [locked, setLocked] = useState(false);
 
   function submit() {
     const hours = Number(duration);
     if (!title.trim() || !hours || hours <= 0) return;
-    onSubmit(title, hours, goalId || null);
+    onSubmit(title, hours, goalId || null, locked);
   }
 
   return (
@@ -86,6 +96,10 @@ function AddPresetForm({ goals, onSubmit, onCancel }) {
           ))}
         </select>
       </div>
+      <label className="flex items-center gap-1.5 text-[11px]" style={{ color: COLORS.inkFaint }}>
+        <input type="checkbox" checked={locked} onChange={(e) => setLocked(e.target.checked)} />
+        <Lock size={10} /> Fixed time (e.g. a class or meeting)
+      </label>
       <div className="flex items-center gap-2 justify-end">
         <button onClick={onCancel} className="text-xs px-2 py-1" style={{ color: COLORS.inkFaint }}>
           Cancel
@@ -99,11 +113,11 @@ function AddPresetForm({ goals, onSubmit, onCancel }) {
 }
 
 // The week view's drag-and-drop source list — pre-made events you build
-// once (title + duration + optional goal) and then drag onto any day/time
-// slot in the week grid as many times as you like. Only shown alongside
-// week view; day/month/year don't have a grid that makes sense to drop
-// onto in the same way.
-export default function EventPresetsPanel({ presets, goals, goalColor, onAddPreset, onDeletePreset }) {
+// once (title + duration + optional goal + whether it's fixed-time) and
+// then drag onto any day/time slot in the week grid as many times as you
+// like. Only shown alongside week view; day/month/year don't have a grid
+// that makes sense to drop onto in the same way.
+export default function EventPresetsPanel({ presets, goals, goalColor, onAddPreset, onDeletePreset, onPresetDragStart, onPresetDragEnd }) {
   const [adding, setAdding] = useState(false);
 
   return (
@@ -120,8 +134,8 @@ export default function EventPresetsPanel({ presets, goals, goalColor, onAddPres
       {adding && (
         <AddPresetForm
           goals={goals}
-          onSubmit={(title, duration, goalId) => {
-            onAddPreset(title, duration, goalId);
+          onSubmit={(title, duration, goalId, locked) => {
+            onAddPreset(title, duration, goalId, locked);
             setAdding(false);
           }}
           onCancel={() => setAdding(false)}
@@ -136,7 +150,14 @@ export default function EventPresetsPanel({ presets, goals, goalColor, onAddPres
 
       <div className="flex flex-col gap-1.5">
         {presets.map((p) => (
-          <PresetCard key={p.id} preset={p} color={goalColor(p.goalId)} onDelete={onDeletePreset} />
+          <PresetCard
+            key={p.id}
+            preset={p}
+            color={goalColor(p.goalId)}
+            onDelete={onDeletePreset}
+            onDragStart={onPresetDragStart}
+            onDragEnd={onPresetDragEnd}
+          />
         ))}
       </div>
     </aside>

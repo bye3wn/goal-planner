@@ -97,9 +97,13 @@ export const seedTemplates = [
 // via usePlanner.createEventFromPreset; the preset itself is untouched, so
 // it can be dragged out again for the next day.
 export const seedPresets = [
-  { id: "preset1", title: "Gym", duration: 1, goalId: null },
-  { id: "preset2", title: "Deep work block", duration: 2, goalId: "g1" },
-  { id: "preset3", title: "Reading", duration: 1, goalId: "g2" },
+  { id: "preset1", title: "Gym", duration: 1, goalId: null, locked: false },
+  { id: "preset2", title: "Deep work block", duration: 2, goalId: "g1", locked: false },
+  { id: "preset3", title: "Reading", duration: 1, goalId: "g2", locked: false },
+  // A locked preset for genuinely fixed-time things — a lecture, a
+  // standing meeting — so you don't have to remember to flip "fixed time"
+  // on every instance by hand.
+  { id: "preset4", title: "Lecture", duration: 1.5, goalId: null, locked: true },
 ];
 
 export function seedItemsFor(key) {
@@ -117,6 +121,7 @@ export function seedItemsFor(key) {
       contributionAmount: null,
       templateId: null,
       done: false,
+      locked: false,
       linkedTaskIds: [], // ids of task-kind items to complete during this event
     },
     {
@@ -130,6 +135,7 @@ export function seedItemsFor(key) {
       contributionAmount: null,
       templateId: null,
       done: false,
+      locked: false,
       linkedTaskIds: [],
     },
     {
@@ -143,6 +149,24 @@ export function seedItemsFor(key) {
       contributionAmount: null,
       templateId: null,
       done: false,
+      locked: false,
+      linkedTaskIds: [],
+    },
+    {
+      // Fixed-time example — a class that can't be dragged or pushed
+      // around: everything else in the week view has to route around it.
+      id: "i4",
+      kind: "event",
+      title: "Systems Design — lecture",
+      location: "Rice Hall 032",
+      start: 11,
+      duration: 1.5,
+      goalId: "g2",
+      milestoneId: null,
+      contributionAmount: null,
+      templateId: null,
+      done: false,
+      locked: true,
       linkedTaskIds: [],
     },
   ].map((t) => ({ ...t, id: `${t.id}-${key}` }));

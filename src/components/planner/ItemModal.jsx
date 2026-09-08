@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { X, Trash2, CalendarClock, ListChecks, Circle, CheckCircle2, ChevronDown, MapPin, AlignLeft } from "lucide-react";
+import { X, Trash2, CalendarClock, ListChecks, Circle, CheckCircle2, ChevronDown, MapPin, AlignLeft, Lock } from "lucide-react";
 import { COLORS, REPEAT_OPTIONS, WEEKDAYS, ALL_WEEKDAYS } from "../../constants/theme";
 import TimeInput from "./TimeInput";
 
@@ -16,6 +16,7 @@ const EMPTY = {
   repeatType: "none", // "none" | "daily" | "custom"
   daysOfWeek: [],
   linkedTaskIds: [],
+  locked: false,
 };
 
 // The "bigger box" — used for both creating a new item and editing an
@@ -106,6 +107,7 @@ export default function ItemModal({ open, initial, goals, dayTasks, onToggleTask
         linkedTaskIds: form.kind === "event" ? form.linkedTaskIds : [],
         location: form.kind === "event" ? form.location : "",
         description: form.kind === "event" ? form.description : "",
+        locked: form.kind === "event" ? form.locked : false,
       },
       initial?.id
     );
@@ -212,6 +214,20 @@ export default function ItemModal({ open, initial, goals, dayTasks, onToggleTask
                 <TimeInput label="End time" value={form.end} onChange={(end) => set({ end })} />
               </div>
             </div>
+          )}
+
+          {form.kind === "event" && (
+            <label className="flex items-start gap-2 text-xs px-3 py-2 rounded-md cursor-pointer" style={{ background: COLORS.canvas }}>
+              <input type="checkbox" checked={form.locked} onChange={(e) => set({ locked: e.target.checked })} className="mt-0.5" />
+              <span>
+                <span className="flex items-center gap-1 font-medium" style={{ color: COLORS.ink }}>
+                  <Lock size={11} /> Fixed time
+                </span>
+                <span style={{ color: COLORS.inkFaint }}>
+                  For something set in stone, like a class or meeting — it can't be dragged, and nothing else can be dropped or pushed on top of it.
+                </span>
+              </span>
+            </label>
           )}
 
           {form.kind === "event" && (

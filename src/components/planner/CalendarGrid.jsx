@@ -139,6 +139,7 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
                 isDragging={drag?.id === ev.id}
                 linkedStats={linkedStats}
                 onPointerDownEvent={handleEventPointerDown}
+                onEventClick={onEventClick}
               />
             );
           })}

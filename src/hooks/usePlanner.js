@@ -3,6 +3,7 @@ import { seedItemsFor, seedTemplates, seedPresets } from "../data/seed";
 import { dateKey } from "../utils/date";
 import { getViewDateKeys, shiftByView } from "../utils/calendarRange";
 import { makeId } from "../utils/id";
+import { placeWithPush } from "../utils/scheduling";
 
 function instanceFromTemplate(template) {
   return {
@@ -17,6 +18,9 @@ function instanceFromTemplate(template) {
     templateId: template.id,
     done: false,
     isSleep: template.isSleep || false,
+    // Fixed-time events (a class, a meeting) — see placeWithPush: locked
+    // events never move and nothing else is allowed to overlap them.
+    locked: template.locked || false,
     location: template.location || "",
     description: template.description || "",
     // Which day's tasks to complete during this event — a fresh empty list
@@ -135,19 +139,20 @@ export function usePlanner({ onItemContribution } = {}) {
   // a NEW item is created on (ignored when editing — edits stay on the
   // item's existing date).
   function saveItem(payload, editingId, targetDateKey = key) {
-    const { kind, title, start, duration, goalId, milestoneId, contributionAmount, repeat, linkedTaskIds, location, description } = payload;
+    const { kind, title, start, duration, goalId, milestoneId, contributionAmount, repeat, linkedTaskIds, location, description, locked } = payload;
     if (!title.trim()) return;
     const daysOfWeek = repeat ? repeat.daysOfWeek : null;
     const bounds = repeat ? { startDate: repeat.startDate || null, endDate: repeat.endDate || null } : {};
     const linked = kind === "event" ? linkedTaskIds || [] : undefined;
+    const lockedFlag = kind === "event" ? !!locked : false;
 
     if (editingId) {
       const dk = findDateKeyOf(editingId);
       if (!dk) return;
       const current = itemsByDate[dk].find((i) => i.id === editingId);
       const wasRepeating = !!current?.templateId;
-      const base = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount, linkedTaskIds: linked, location: location || "", description: description || "" };
-      const templateBase = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount, location: location || "", description: description || "" };
+      const base = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount, linkedTaskIds: linked, location: location || "", description: description || "", locked: lockedFlag };
+      const templateBase = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount, location: location || "", description: description || "", locked: lockedFlag };
 
       if (daysOfWeek && !wasRepeating) {
         const template = { id: makeId("tpl"), ...templateBase, daysOfWeek, ...bounds };
@@ -168,7 +173,7 @@ export function usePlanner({ onItemContribution } = {}) {
     }
 
     // Creating new
-    const base = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount, location: location || "", description: description || "" };
+    const base = { kind, title: title.trim(), start, duration, goalId, milestoneId, contributionAmount, location: location || "", description: description || "", locked: lockedFlag };
     if (daysOfWeek) {
       const template = { id: makeId("tpl"), ...base, daysOfWeek, ...bounds };
       setTemplates((tpls) => [...tpls, template]);
@@ -220,56 +225,89 @@ export function usePlanner({ onItemContribution } = {}) {
   // Pre-made events for the week view's drag-and-drop list. A preset has no
   // date of its own — dragging it onto the grid stamps out a real event via
   // createEventFromPreset, leaving the preset itself reusable.
-  function addPreset(title, duration, goalId) {
+  function addPreset(title, duration, goalId, locked) {
     if (!title.trim()) return;
-    setPresets((ps) => [...ps, { id: makeId("preset"), title: title.trim(), duration, goalId: goalId || null }]);
+    setPresets((ps) => [...ps, { id: makeId("preset"), title: title.trim(), duration, goalId: goalId || null, locked: !!locked }]);
   }
   function deletePreset(id) {
     setPresets((ps) => ps.filter((p) => p.id !== id));
   }
+
+  // Inserts `draggedItem` (a full event object — id/start/duration/locked
+  // plus whatever else) into dateKeyStr's event list via placeWithPush,
+  // which both resolves the drop position and pushes any unlocked events
+  // after it out of the way so nothing overlaps. Works whether draggedItem
+  // is already in that day's list (a move) or brand new (a preset drop) —
+  // either way it's excluded from `others` by id before placing.
+  function pushLayoutForDay(dateKeyStr, draggedItem) {
+    updateItemsAt(dateKeyStr, (its) => {
+      const others = its.filter((i) => i.kind === "event" && i.id !== draggedItem.id);
+      const nonEvents = its.filter((i) => i.kind !== "event");
+      return [...nonEvents, ...placeWithPush(draggedItem, others)];
+    });
+  }
+
   function createEventFromPreset(preset, toDateKey, start) {
-    updateItemsAt(toDateKey, (its) => [
-      ...its,
-      {
-        id: makeId("i"),
-        kind: "event",
-        title: preset.title,
-        start,
-        duration: preset.duration,
-        goalId: preset.goalId,
-        milestoneId: null,
-        contributionAmount: null,
-        templateId: null,
-        done: false,
-        linkedTaskIds: [],
-        location: "",
-        description: "",
-      },
-    ]);
+    pushLayoutForDay(toDateKey, {
+      id: makeId("i"),
+      kind: "event",
+      title: preset.title,
+      start,
+      duration: preset.duration,
+      goalId: preset.goalId,
+      milestoneId: null,
+      contributionAmount: null,
+      templateId: null,
+      done: false,
+      locked: preset.locked || false,
+      linkedTaskIds: [],
+      location: "",
+      description: "",
+    });
   }
 
   // Drags an existing event to a new day/time in the week grid (no swap —
   // the target slot is empty). Cross-day moves splice the item out of its
-  // old date's array and into the new one; same-day moves just update start.
+  // old date's array and into the new one; same-day moves just re-place it
+  // in the same list. Either way the destination day gets pushWithPush'd so
+  // anything after the drop point that would now overlap slides later —
+  // locked events on the destination day stay put and route the push
+  // around them instead. Locked events can't be dragged in the first place
+  // (guarded in the UI), but this also no-ops defensively if one slips
+  // through.
   function moveEvent(id, toDateKey, newStart) {
     const dk = findDateKeyOf(id);
     if (!dk) return;
+    const item = itemsByDate[dk].find((i) => i.id === id);
+    if (!item || item.locked) return;
+    const draggedItem = { ...item, start: newStart };
+
     if (dk === toDateKey) {
-      updateItemsAt(dk, (its) => its.map((i) => (i.id === id ? { ...i, start: newStart } : i)));
+      pushLayoutForDay(dk, draggedItem);
       return;
     }
-    const item = itemsByDate[dk].find((i) => i.id === id);
-    if (!item) return;
-    setItemsByDate((prev) => ({
-      ...prev,
-      [dk]: prev[dk].filter((i) => i.id !== id),
-      [toDateKey]: [...(prev[toDateKey] || []), { ...item, start: newStart }],
-    }));
+
+    setItemsByDate((prev) => {
+      const withoutOld = (prev[dk] || []).filter((i) => i.id !== id);
+      const destItems = prev[toDateKey] || [];
+      const destEvents = destItems.filter((i) => i.kind === "event");
+      const destNonEvents = destItems.filter((i) => i.kind !== "event");
+      return {
+        ...prev,
+        [dk]: withoutOld,
+        [toDateKey]: [...destNonEvents, ...placeWithPush(draggedItem, destEvents)],
+      };
+    });
   }
 
-  // Dragging one event onto another trades their day+time outright: each
-  // event ends up exactly where the other one was, identity (id, title,
-  // goal, etc.) untouched — a true swap rather than a push/overlap.
+  // Dragging one event onto another trades their day+time: each takes over
+  // the other's slot. If the incoming event is longer than the one it
+  // displaced, that would normally overlap whatever came right after —
+  // instead of allowing that, each side is placed via placeWithPush so
+  // anything unlocked after it slides later to make room (locked events
+  // never move, and the push just routes around them). Neither side moves
+  // at all if either one is locked — a fixed-time class or meeting can't be
+  // swapped out of its slot.
   function swapEvents(idA, idB) {
     if (idA === idB) return;
     const dkA = findDateKeyOf(idA);
@@ -277,24 +315,36 @@ export function usePlanner({ onItemContribution } = {}) {
     if (!dkA || !dkB) return;
     const a = itemsByDate[dkA].find((i) => i.id === idA);
     const b = itemsByDate[dkB].find((i) => i.id === idB);
-    if (!a || !b) return;
+    if (!a || !b || a.locked || b.locked) return;
+
+    const bAtASlot = { ...b, start: a.start };
+    const aAtBSlot = { ...a, start: b.start };
 
     if (dkA === dkB) {
-      updateItemsAt(dkA, (its) =>
-        its.map((i) => {
-          if (i.id === idA) return { ...i, start: b.start };
-          if (i.id === idB) return { ...i, start: a.start };
-          return i;
-        })
-      );
+      updateItemsAt(dkA, (its) => {
+        const others = its.filter((i) => i.kind === "event" && i.id !== idA && i.id !== idB);
+        const nonEvents = its.filter((i) => i.kind !== "event");
+        const withB = placeWithPush(bAtASlot, others);
+        const withBoth = placeWithPush(aAtBSlot, withB);
+        return [...nonEvents, ...withBoth];
+      });
       return;
     }
 
-    setItemsByDate((prev) => ({
-      ...prev,
-      [dkA]: prev[dkA].map((i) => (i.id === idA ? { ...b, start: a.start } : i)),
-      [dkB]: prev[dkB].map((i) => (i.id === idB ? { ...a, start: b.start } : i)),
-    }));
+    setItemsByDate((prev) => {
+      const itemsA = prev[dkA] || [];
+      const itemsB = prev[dkB] || [];
+      const eventsA = itemsA.filter((i) => i.kind === "event" && i.id !== idA);
+      const nonEventsA = itemsA.filter((i) => i.kind !== "event");
+      const eventsB = itemsB.filter((i) => i.kind === "event" && i.id !== idB);
+      const nonEventsB = itemsB.filter((i) => i.kind !== "event");
+
+      return {
+        ...prev,
+        [dkA]: [...nonEventsA, ...placeWithPush(bAtASlot, eventsA)],
+        [dkB]: [...nonEventsB, ...placeWithPush(aAtBSlot, eventsB)],
+      };
+    });
   }
 
   // Batch-creates events parsed from an imported .ics file. All-day items
@@ -322,6 +372,7 @@ export function usePlanner({ onItemContribution } = {}) {
           id: makeId("i"), kind: ev.allDay ? "task" : "event", title: ev.title,
           start: ev.allDay ? null : ev.start, duration: ev.allDay ? null : ev.duration,
           goalId: null, milestoneId: null, contributionAmount: null, templateId: null, done: false,
+          locked: false,
           location: ev.location || "", description: ev.description || "",
           linkedTaskIds: ev.allDay ? undefined : [],
         };

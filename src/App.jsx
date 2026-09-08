@@ -199,6 +199,16 @@ export default function App() {
     if (preset) createEventFromPreset(preset, targetDateKey, start);
   }
 
+  // WeekGrid's live drop preview needs to know what's being dragged in
+  // order to render it — but a preset card being dragged in from
+  // EventPresetsPanel is a sibling of WeekGrid, not a descendant, and
+  // native drag-and-drop's payload isn't readable until the actual drop.
+  // So the preset itself is tracked here for the duration of the drag and
+  // handed down to WeekGrid as a prop (dragging an existing EVENT within
+  // the grid doesn't need this — source and target are both inside
+  // WeekGrid there, so it just keeps that as local state).
+  const [draggingPreset, setDraggingPreset] = useState(null);
+
   const dayTasksForModal = itemModal
     ? allItems.filter((i) => i.kind === "task" && i.date === itemModal.targetDateKey)
     : [];
@@ -314,10 +324,19 @@ export default function App() {
               onDropPreset={handleDropPreset}
               onMoveEvent={moveEvent}
               onSwapEvents={swapEvents}
+              draggingPreset={draggingPreset}
             />
           )}
           {view === "week" && (
-            <EventPresetsPanel presets={presets} goals={goals} goalColor={goalColor} onAddPreset={addPreset} onDeletePreset={deletePreset} />
+            <EventPresetsPanel
+              presets={presets}
+              goals={goals}
+              goalColor={goalColor}
+              onAddPreset={addPreset}
+              onDeletePreset={deletePreset}
+              onPresetDragStart={setDraggingPreset}
+              onPresetDragEnd={() => setDraggingPreset(null)}
+            />
           )}
           {view === "month" && (
             <MonthGrid
