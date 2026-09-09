@@ -144,7 +144,9 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
             );
           })}
 
-          {/* Live time readout while dragging, so it's clear exactly where it'll land */}
+          {/* Live time readout while dragging, so it's clear exactly where it'll
+              land — needs a z-index above every EventBlock (dragged one included,
+              which uses 20) or it gets hidden behind whatever it's dragged near. */}
           {drag && (
             <div
               className="absolute right-2 font-mono text-[11px] px-2 py-0.5 rounded pointer-events-none"
@@ -152,6 +154,7 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
                 top: (drag.currentStart - DAY_START_HOUR) * HOUR_HEIGHT_PX - 20,
                 background: COLORS.forest,
                 color: "#fff",
+                zIndex: 30,
               }}
             >
               {formatTime(drag.currentStart)}
