@@ -224,10 +224,13 @@ export function usePlanner({ onItemContribution } = {}) {
 
   // Pre-made events for the week view's drag-and-drop list. A preset has no
   // date of its own — dragging it onto the grid stamps out a real event via
-  // createEventFromPreset, leaving the preset itself reusable.
-  function addPreset(title, duration, goalId, locked) {
+  // createEventFromPreset, leaving the preset itself reusable. Presets are
+  // never fixed-time themselves (every instance a preset creates starts out
+  // draggable) — "fixed time" is only offered once an event is actually on
+  // the calendar, see ItemModal.
+  function addPreset(title, duration, goalId) {
     if (!title.trim()) return;
-    setPresets((ps) => [...ps, { id: makeId("preset"), title: title.trim(), duration, goalId: goalId || null, locked: !!locked }]);
+    setPresets((ps) => [...ps, { id: makeId("preset"), title: title.trim(), duration, goalId: goalId || null }]);
   }
   function deletePreset(id) {
     setPresets((ps) => ps.filter((p) => p.id !== id));
@@ -259,7 +262,7 @@ export function usePlanner({ onItemContribution } = {}) {
       contributionAmount: null,
       templateId: null,
       done: false,
-      locked: preset.locked || false,
+      locked: false,
       linkedTaskIds: [],
       location: "",
       description: "",

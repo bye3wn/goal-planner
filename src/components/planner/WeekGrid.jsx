@@ -66,7 +66,7 @@ export default function WeekGrid({
   const [hover, setHover] = useState(null); // null | { dateKey, hour }
 
   const ghost = draggingPreset
-    ? { id: null, duration: draggingPreset.duration, title: draggingPreset.title, locked: draggingPreset.locked }
+    ? { id: null, duration: draggingPreset.duration, title: draggingPreset.title }
     : dragEvent;
 
   const hoverDayEvents = hover ? allItems.filter((i) => i.date === hover.dateKey && i.kind === "event" && i.id !== ghost?.id) : [];

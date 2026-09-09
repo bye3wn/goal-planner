@@ -216,7 +216,7 @@ export default function ItemModal({ open, initial, goals, dayTasks, onToggleTask
             </div>
           )}
 
-          {form.kind === "event" && (
+          {form.kind === "event" && isEditing && (
             <label className="flex items-start gap-2 text-xs px-3 py-2 rounded-md cursor-pointer" style={{ background: COLORS.canvas }}>
               <input type="checkbox" checked={form.locked} onChange={(e) => set({ locked: e.target.checked })} className="mt-0.5" />
               <span>

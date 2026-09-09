@@ -97,13 +97,10 @@ export const seedTemplates = [
 // via usePlanner.createEventFromPreset; the preset itself is untouched, so
 // it can be dragged out again for the next day.
 export const seedPresets = [
-  { id: "preset1", title: "Gym", duration: 1, goalId: null, locked: false },
-  { id: "preset2", title: "Deep work block", duration: 2, goalId: "g1", locked: false },
-  { id: "preset3", title: "Reading", duration: 1, goalId: "g2", locked: false },
-  // A locked preset for genuinely fixed-time things — a lecture, a
-  // standing meeting — so you don't have to remember to flip "fixed time"
-  // on every instance by hand.
-  { id: "preset4", title: "Lecture", duration: 1.5, goalId: null, locked: true },
+  { id: "preset1", title: "Gym", duration: 1, goalId: null },
+  { id: "preset2", title: "Deep work block", duration: 2, goalId: "g1" },
+  { id: "preset3", title: "Reading", duration: 1, goalId: "g2" },
+  { id: "preset4", title: "Lecture", duration: 1.5, goalId: null },
 ];
 
 export function seedItemsFor(key) {
