@@ -75,9 +75,16 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
   function handlePointerUp() {
     if (!drag) return;
     gridRef.current?.releasePointerCapture(drag.pointerId);
+    // setPointerCapture means the browser's native "click" that follows
+    // this pointerup targets the grid itself, not the event block the
+    // pointerdown actually started on — so it always needs suppressing
+    // here, not just after a real drag. Without this, a plain click on an
+    // event opened its edit modal via onEventClick below, and then that
+    // phantom grid click immediately fired handleGridClick right after,
+    // overwriting it with a brand new "create event" modal.
+    suppressNextClickRef.current = true;
     if (drag.moved) {
       onRescheduleEvents(computePushLayout(events, drag.id, drag.currentStart, drag.duration));
-      suppressNextClickRef.current = true;
     } else {
       const original = events.find((ev) => ev.id === drag.id);
       if (original) onEventClick(original);
