@@ -30,6 +30,30 @@ export function snapToQuarterHour(hour) {
 export function placeWithPush(dragged, others) {
   const earlier = others.filter((e) => e.start < dragged.start).sort((a, b) => a.start - b.start);
   const later = others.filter((e) => e.start >= dragged.start).sort((a, b) => a.start - b.start);
+  const lockedEvents = others.filter((e) => e.locked);
+
+  // Nudges `start` forward past any locked event that a block of `duration`
+  // starting there would overlap, repeating in case that lands on another
+  // locked block right after (back-to-back locked events). Used both for
+  // the dragged event's own placement AND for every event it cascades a
+  // push onto below — without the latter, an event landing right before a
+  // locked one could get pushed just far enough to overlap it instead of
+  // routing around it.
+  function avoidLocked(start, duration) {
+    let s = start;
+    let adjusted = true;
+    while (adjusted) {
+      adjusted = false;
+      for (const e of lockedEvents) {
+        const lockedEnd = e.start + e.duration;
+        if (s < lockedEnd && s + duration > e.start) {
+          s = lockedEnd;
+          adjusted = true;
+        }
+      }
+    }
+    return s;
+  }
 
   let cursor = dragged.start;
   if (earlier.length) {
@@ -37,23 +61,7 @@ export function placeWithPush(dragged, others) {
     const lastEnd = last.start + last.duration;
     if (cursor < lastEnd) cursor = lastEnd; // can't overlap something already placed before us
   }
-
-  // The dragged event itself must not land on a locked block either — push
-  // it forward past any locked event it would otherwise overlap, repeating
-  // in case that lands on another locked block right after (back-to-back
-  // locked events).
-  let adjusted = true;
-  while (adjusted) {
-    adjusted = false;
-    for (const e of later) {
-      if (!e.locked) continue;
-      const lockedEnd = e.start + e.duration;
-      if (cursor < lockedEnd && cursor + dragged.duration > e.start) {
-        cursor = lockedEnd;
-        adjusted = true;
-      }
-    }
-  }
+  cursor = avoidLocked(cursor, dragged.duration);
 
   const placedDragged = { ...dragged, start: cursor };
 
@@ -64,7 +72,7 @@ export function placeWithPush(dragged, others) {
       pushCursor = Math.max(pushCursor, e.start + e.duration);
       return e;
     }
-    const start = Math.max(e.start, pushCursor);
+    const start = avoidLocked(Math.max(e.start, pushCursor), e.duration);
     pushCursor = start + e.duration;
     return { ...e, start };
   });
