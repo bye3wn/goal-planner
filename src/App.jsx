@@ -68,6 +68,7 @@ export default function App() {
     addPreset,
     deletePreset,
     createEventFromPreset,
+    createTransitEvent,
     moveEvent,
     swapEvents,
   } = usePlanner({ onItemContribution: addMilestoneProgress });
@@ -330,6 +331,7 @@ export default function App() {
               onRescheduleEvents={rescheduleEvents}
               onSlotClick={openCreateEvent}
               onEventClick={openEditItem}
+              onAddTransit={(start, duration) => createTransitEvent(dateKey(currentDate), start, duration)}
               zoom={zoom}
             />
           )}
@@ -343,6 +345,7 @@ export default function App() {
               onDayHeaderClick={jumpToDay}
               onDropPreset={handleDropPreset}
               onMoveEvent={moveEvent}
+              onAddTransit={(date, start, duration) => createTransitEvent(dateKey(date), start, duration)}
               zoom={zoom}
               onSwapEvents={swapEvents}
               draggingPreset={draggingPreset}

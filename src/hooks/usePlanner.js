@@ -269,6 +269,33 @@ export function usePlanner({ onItemContribution } = {}) {
     });
   }
 
+  // Fills a detected gap between two events with a "Transit" placeholder —
+  // one click from the calendar grid's "add transit" affordance (see
+  // scheduling.findTransitGaps), sized to exactly the gap so it doesn't
+  // need pushing anything else out of the way. isTransit only changes how
+  // it's drawn (a striped block with a car icon instead of a normal
+  // event) — it's a normal event otherwise, so it can be renamed, dragged,
+  // or deleted like anything else once created.
+  function createTransitEvent(toDateKey, start, duration) {
+    pushLayoutForDay(toDateKey, {
+      id: makeId("i"),
+      kind: "event",
+      title: "Transit",
+      start,
+      duration,
+      goalId: null,
+      milestoneId: null,
+      contributionAmount: null,
+      templateId: null,
+      done: false,
+      locked: false,
+      isTransit: true,
+      linkedTaskIds: [],
+      location: "",
+      description: "",
+    });
+  }
+
   // Drags an existing event to a new day/time in the week grid (no swap —
   // the target slot is empty). Cross-day moves splice the item out of its
   // old date's array and into the new one; same-day moves just re-place it
@@ -487,6 +514,7 @@ export function usePlanner({ onItemContribution } = {}) {
     addPreset,
     deletePreset,
     createEventFromPreset,
+    createTransitEvent,
     moveEvent,
     swapEvents,
   };

@@ -1,11 +1,16 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Lock } from "lucide-react";
+import { Lock, Car } from "lucide-react";
 import { COLORS, HOURS, HOUR_HEIGHT_PX, DAY_START_HOUR } from "../../constants/theme";
 import { formatHour, formatTime, formatDuration, dateKey } from "../../utils/date";
 import { isToday } from "../../utils/calendarRange";
-import { snapToQuarterHour, overlapsLocked } from "../../utils/scheduling";
+import { snapToQuarterHour, overlapsLocked, layoutEventBlocks, findTransitGaps } from "../../utils/scheduling";
 
 const DEFAULT_SCROLL_HOUR = 7;
+const MIN_EVENT_HEIGHT_PX = 18;
+// Narrower than the day view's — a column here is only ~90-130px wide, no
+// room for a text label, so this just gates whether the icon-only "add
+// transit" affordance is worth showing at all at the current zoom.
+const MIN_GAP_PX = 10;
 
 function readDragPayload(e) {
   try {
@@ -54,6 +59,7 @@ export default function WeekGrid({
   onDropPreset,
   onMoveEvent,
   onSwapEvents,
+  onAddTransit,
   draggingPreset,
   zoom = 1,
 }) {
@@ -178,6 +184,13 @@ export default function WeekGrid({
           {weekDates.map((d) => {
             const dk = dateKey(d);
             const dayEvents = allItems.filter((i) => i.date === dk && i.kind === "event");
+            const dayEventLayout = layoutEventBlocks(dayEvents, {
+              hourHeight,
+              dayStartHour: DAY_START_HOUR,
+              minHeightPx: MIN_EVENT_HEIGHT_PX,
+              zoom,
+            });
+            const dayTransitGaps = onAddTransit ? findTransitGaps(dayEvents) : [];
             const showGhostHere = ghost && hover && hover.dateKey === dk;
             return (
               <div
@@ -203,53 +216,93 @@ export default function WeekGrid({
                   <div key={h} className="absolute left-0 right-0" style={{ top: idx * hourHeight, borderTop: `1px solid ${COLORS.line}` }} />
                 ))}
 
-                {dayEvents.map((ev) => {
-                  const top = (ev.start - DAY_START_HOUR) * hourHeight;
-                  const height = Math.max(18 * zoom, ev.duration * hourHeight - 2);
+                {dayEventLayout.map(({ event: ev, top, height }) => (
+                  <div
+                    key={ev.id}
+                    draggable={!ev.locked}
+                    onDragStart={(e) => {
+                      e.stopPropagation();
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("application/json", JSON.stringify({ type: "event", eventId: ev.id }));
+                      setDragEvent({ id: ev.id, duration: ev.duration, title: ev.title });
+                    }}
+                    onDragEnd={finishDrag}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => handleEventDrop(e, ev, d)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEventClick(ev, d);
+                    }}
+                    className="absolute left-0.5 right-0.5 rounded px-1.5 py-0.5 overflow-hidden"
+                    style={{
+                      top,
+                      height,
+                      background: ev.isTransit
+                        ? `repeating-linear-gradient(135deg, ${COLORS.panel}, ${COLORS.panel} 5px, ${COLORS.canvas} 5px, ${COLORS.canvas} 10px)`
+                        : ev.isSleep
+                        ? COLORS.sleep
+                        : ev.done
+                        ? "#F4F3EE"
+                        : COLORS.panel,
+                      border: `1px ${ev.isTransit ? "dashed" : "solid"} ${ev.isSleep ? COLORS.sleep : COLORS.line}`,
+                      borderLeft: ev.isSleep
+                        ? `3px solid ${COLORS.sleep}`
+                        : `3px ${ev.isTransit ? "dashed" : "solid"} ${ev.isTransit ? COLORS.inkFaint : goalColor(ev.goalId)}`,
+                      opacity: ev.done && !ev.isSleep ? 0.6 : 1,
+                      color: ev.isSleep ? "#E7E9E3" : COLORS.ink,
+                      cursor: ev.locked ? "default" : "grab",
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      {ev.isTransit && <Car size={10} color={ev.isSleep ? "#9BA39A" : COLORS.inkFaint} className="flex-shrink-0" />}
+                      <span
+                        className="font-medium truncate flex-1"
+                        style={{ fontSize: titleSize, textDecoration: ev.done && !ev.isSleep ? "line-through" : "none" }}
+                      >
+                        {ev.title}
+                      </span>
+                      {ev.locked && <Lock size={9} color={ev.isSleep ? "#9BA39A" : COLORS.inkFaint} className="flex-shrink-0" />}
+                    </div>
+                    {height > 30 && (
+                      <div className="font-mono text-[9px]" style={{ color: ev.isSleep ? "#9BA39A" : COLORS.inkFaint }}>
+                        {formatTime(ev.start)}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {/* Icon-only "add transit" affordance — a week column is too
+                    narrow for the day view's text label. A small pill
+                    centered in the gap rather than spanning its whole
+                    height: opacity-0-until-hover doesn't remove it from
+                    hit-testing, so covering the entire gap meant a normal
+                    click-to-create-event anywhere in a long gap silently
+                    hit this instead — see CalendarGrid's version of this
+                    same fix for the full story. */}
+                {dayTransitGaps.map((gap) => {
+                  const gapPx = gap.duration * hourHeight;
+                  if (gapPx < MIN_GAP_PX) return null;
+                  const pillHeight = Math.min(18, gapPx - 2);
+                  const gapTop = (gap.start - DAY_START_HOUR) * hourHeight;
                   return (
-                    <div
-                      key={ev.id}
-                      draggable={!ev.locked}
-                      onDragStart={(e) => {
-                        e.stopPropagation();
-                        e.dataTransfer.effectAllowed = "move";
-                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "event", eventId: ev.id }));
-                        setDragEvent({ id: ev.id, duration: ev.duration, title: ev.title });
-                      }}
-                      onDragEnd={finishDrag}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => handleEventDrop(e, ev, d)}
+                    <button
+                      key={`gap-${gap.start}`}
                       onClick={(e) => {
                         e.stopPropagation();
-                        onEventClick(ev, d);
+                        onAddTransit(d, gap.start, gap.duration);
                       }}
-                      className="absolute left-0.5 right-0.5 rounded px-1.5 py-0.5 overflow-hidden"
+                      className="absolute left-1.5 right-1.5 flex items-center justify-center rounded-full overflow-hidden opacity-0 hover:opacity-100 transition-opacity"
                       style={{
-                        top,
-                        height,
-                        background: ev.isSleep ? COLORS.sleep : ev.done ? "#F4F3EE" : COLORS.panel,
-                        border: `1px solid ${ev.isSleep ? COLORS.sleep : COLORS.line}`,
-                        borderLeft: `3px solid ${ev.isSleep ? COLORS.sleep : goalColor(ev.goalId)}`,
-                        opacity: ev.done && !ev.isSleep ? 0.6 : 1,
-                        color: ev.isSleep ? "#E7E9E3" : COLORS.ink,
-                        cursor: ev.locked ? "default" : "grab",
+                        top: gapTop + gapPx / 2 - pillHeight / 2,
+                        height: pillHeight,
+                        background: COLORS.panel,
+                        border: `1px dashed ${COLORS.inkFaint}`,
+                        boxShadow: "0 1px 4px rgba(35,41,32,0.12)",
                       }}
+                      title={`Add ${formatDuration(gap.duration)} of transit time`}
                     >
-                      <div className="flex items-center gap-1">
-                        <span
-                          className="font-medium truncate flex-1"
-                          style={{ fontSize: titleSize, textDecoration: ev.done && !ev.isSleep ? "line-through" : "none" }}
-                        >
-                          {ev.title}
-                        </span>
-                        {ev.locked && <Lock size={9} color={ev.isSleep ? "#9BA39A" : COLORS.inkFaint} className="flex-shrink-0" />}
-                      </div>
-                      {height > 30 && (
-                        <div className="font-mono text-[9px]" style={{ color: ev.isSleep ? "#9BA39A" : COLORS.inkFaint }}>
-                          {formatTime(ev.start)}
-                        </div>
-                      )}
-                    </div>
+                      <Car size={10} color={COLORS.inkFaint} />
+                    </button>
                   );
                 })}
 

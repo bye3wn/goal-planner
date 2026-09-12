@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Car } from "lucide-react";
 import { COLORS, HOURS, HOUR_HEIGHT_PX, DAY_START_HOUR, DAY_END_HOUR } from "../../constants/theme";
-import { formatHour, formatTime } from "../../utils/date";
-import { snapToQuarterHour, computePushLayout } from "../../utils/scheduling";
+import { formatHour, formatTime, formatDuration } from "../../utils/date";
+import { snapToQuarterHour, computePushLayout, layoutEventBlocks, findTransitGaps } from "../../utils/scheduling";
 import EventBlock from "./EventBlock";
 
 // A small pixel threshold before a pointerdown-then-move counts as a drag
@@ -12,6 +12,11 @@ const DRAG_THRESHOLD_PX = 4;
 // The day now spans all 24 hours, so on first render we scroll to a
 // reasonable starting point instead of dropping you at midnight.
 const DEFAULT_SCROLL_HOUR = 7;
+
+// The floor every event block gets before scaling with zoom — see
+// scheduling.layoutEventBlocks for why this has to be capped against
+// whatever room is actually free before the next event.
+const MIN_EVENT_HEIGHT_PX = 22;
 
 // Google Calendar-style day grid. Dragging an event tracks the pointer
 // continuously (not native HTML5 DnD), snaps to 15-minute increments, and
@@ -23,7 +28,7 @@ const DEFAULT_SCROLL_HOUR = 7;
 // hourHeight rather than the fixed constant, so zooming in/out widens or
 // narrows the hour rows AND scales event blocks (and, via EventBlock's own
 // height thresholds, how much detail they show) together.
-export default function CalendarGrid({ events, dayTasks, goalColor, onRescheduleEvents, onSlotClick, onEventClick, zoom = 1 }) {
+export default function CalendarGrid({ events, dayTasks, goalColor, onRescheduleEvents, onSlotClick, onEventClick, onAddTransit, zoom = 1 }) {
   const gridRef = useRef(null);
   const scrollRef = useRef(null);
   const hourHeight = HOUR_HEIGHT_PX * zoom;
@@ -62,6 +67,17 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
     if (!drag) return events;
     return computePushLayout(events, drag.id, drag.currentStart, drag.duration);
   }, [events, drag]);
+
+  const eventLayout = useMemo(
+    () => layoutEventBlocks(displayEvents, { hourHeight, dayStartHour: DAY_START_HOUR, minHeightPx: MIN_EVENT_HEIGHT_PX, zoom }),
+    [displayEvents, hourHeight, zoom]
+  );
+
+  // Gaps worth offering an "add transit" shortcut for — computed from the
+  // stable `events` (not the live drag preview) and hidden entirely while
+  // dragging, so the affordance doesn't flicker in and out as a dragged
+  // event temporarily opens and closes gaps on its way to a drop point.
+  const transitGaps = useMemo(() => (drag ? [] : findTransitGaps(events)), [events, drag]);
 
   function clientYToHour(clientY) {
     const rect = gridRef.current.getBoundingClientRect();
@@ -154,7 +170,7 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
             </div>
           ))}
 
-          {displayEvents.map((ev) => {
+          {eventLayout.map(({ event: ev, top, height }) => {
             const linkedStats = ev.linkedTaskIds?.length
               ? { total: ev.linkedTaskIds.length, done: (dayTasks || []).filter((t) => ev.linkedTaskIds.includes(t.id) && t.done).length }
               : null;
@@ -163,8 +179,9 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
                 key={ev.id}
                 event={ev}
                 color={goalColor(ev.goalId)}
-                dayStartHour={DAY_START_HOUR}
-                hourHeight={hourHeight}
+                top={top}
+                height={height}
+                zoom={zoom}
                 isDragging={drag?.id === ev.id}
                 linkedStats={linkedStats}
                 onPointerDownEvent={handleEventPointerDown}
@@ -172,6 +189,48 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
               />
             );
           })}
+
+          {/* "Add transit" shortcut — one per gap between two events that's
+              long enough to plausibly be a commute (see findTransitGaps). A
+              small pill centered in the gap rather than a button spanning
+              its whole height: opacity-0-until-hover still leaves it fully
+              clickable at all times (invisible elements aren't removed from
+              hit-testing), so covering the ENTIRE gap meant a normal
+              click-to-create-event anywhere in a long gap silently hit this
+              instead. Keeping it small confines that to one deliberate spot
+              instead of the whole gap. stopPropagation keeps a click here
+              from also triggering the grid's click-to-create handler. */}
+          {onAddTransit &&
+            transitGaps.map((gap) => {
+              const gapPx = gap.duration * hourHeight;
+              const MIN_GAP_PX = 14;
+              if (gapPx < MIN_GAP_PX) return null;
+              const pillHeight = Math.min(22, gapPx - 2);
+              const gapTop = (gap.start - DAY_START_HOUR) * hourHeight;
+              return (
+                <button
+                  key={`gap-${gap.start}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddTransit(gap.start, gap.duration);
+                  }}
+                  className="absolute left-8 right-8 flex items-center justify-center gap-1.5 rounded-full overflow-hidden opacity-0 hover:opacity-100 transition-opacity"
+                  style={{
+                    top: gapTop + gapPx / 2 - pillHeight / 2,
+                    height: pillHeight,
+                    background: COLORS.panel,
+                    border: `1px dashed ${COLORS.inkFaint}`,
+                    boxShadow: "0 1px 4px rgba(35,41,32,0.12)",
+                  }}
+                  title={`Add ${formatDuration(gap.duration)} of transit time`}
+                >
+                  <Car size={12} color={COLORS.inkFaint} className="flex-shrink-0" />
+                  <span className="text-[11px] font-medium truncate" style={{ color: COLORS.inkFaint }}>
+                    Add transit · {formatDuration(gap.duration)}
+                  </span>
+                </button>
+              );
+            })}
 
           {/* Live time readout while dragging, so it's clear exactly where it'll
               land — needs a z-index above every EventBlock (dragged one included,

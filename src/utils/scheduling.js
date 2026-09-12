@@ -97,3 +97,50 @@ export function overlapsLocked(start, duration, events) {
   const end = start + duration;
   return events.some((e) => e.locked && start < e.start + e.duration && end > e.start);
 }
+
+// Below this, a gap is just the normal small buffer between things — not
+// worth offering a "add transit" shortcut for. Above the max, it reads as
+// genuinely open/free time rather than a commute between two places.
+export const MIN_TRANSIT_GAP_HOURS = 5 / 60;
+export const MAX_TRANSIT_GAP_HOURS = 3;
+
+// Finds open stretches between consecutive events (by start time) that are
+// long enough to plausibly be "getting from one thing to the next" but not
+// so long they're just open time — used to offer a one-click "add transit"
+// shortcut in exactly those gaps instead of cluttering every blank part of
+// the day. Returns [{ start, duration }, ...] in chronological order.
+export function findTransitGaps(events, minHours = MIN_TRANSIT_GAP_HOURS, maxHours = MAX_TRANSIT_GAP_HOURS) {
+  const sorted = [...events].sort((a, b) => a.start - b.start);
+  const gaps = [];
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const end = sorted[i].start + sorted[i].duration;
+    const nextStart = sorted[i + 1].start;
+    const gapDuration = nextStart - end;
+    if (gapDuration >= minHours && gapDuration <= maxHours) {
+      gaps.push({ start: end, duration: gapDuration });
+    }
+  }
+  return gaps;
+}
+
+// Computes each event's on-screen top/height in pixels, sorted by start,
+// with one important constraint beyond the obvious duration*hourHeight:
+// every block gets a minimum height (minHeightPx, scaled by zoom) so short
+// events stay legible instead of collapsing to a hairline — but that floor
+// is capped at whatever room is actually available before the NEXT event
+// starts. Without that cap, a 10-minute event's enforced minimum height
+// (meant for readability) visually extends past its real end time and
+// bleeds into whatever comes right after it, even though the underlying
+// data has no overlap at all — it only ever looked like one.
+export function layoutEventBlocks(events, { hourHeight, dayStartHour, minHeightPx, zoom = 1 }) {
+  const sorted = [...events].sort((a, b) => a.start - b.start);
+  return sorted.map((event, idx) => {
+    const top = (event.start - dayStartHour) * hourHeight;
+    const natural = event.duration * hourHeight - 2;
+    const desired = Math.max(minHeightPx * zoom, natural);
+    const next = sorted[idx + 1];
+    const available = next ? (next.start - dayStartHour) * hourHeight - top - 1 : Infinity;
+    const height = Math.max(4, Math.min(desired, available));
+    return { event, top, height };
+  });
+}

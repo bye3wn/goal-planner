@@ -1,25 +1,22 @@
 import React from "react";
-import { Repeat, ListChecks, Moon, MapPin, Lock, AlignLeft } from "lucide-react";
-import { COLORS, HOUR_HEIGHT_PX } from "../../constants/theme";
+import { Repeat, ListChecks, Moon, MapPin, Lock, AlignLeft, Car } from "lucide-react";
+import { COLORS } from "../../constants/theme";
 import { formatTime } from "../../utils/date";
 
-// Absolutely positioned within the grid — top and height are computed from
-// start/duration so the block's size visually matches how long it takes.
-// hourHeight is the CURRENT zoomed pixels-per-hour (HOUR_HEIGHT_PX * the
-// active zoom factor, from theme.ZOOM_LEVELS) — passed down rather than
-// imported directly so the block resizes when the grid is zoomed. There's
-// no separate "detail level" concept: the existing height thresholds below
-// (for time, location, description) just naturally clear or miss as the
-// block gets taller or shorter with zoom, which is what makes zoomed-in
-// events show more and zoomed-out ones show less without extra state.
+// Absolutely positioned within the grid — top/height are computed by the
+// PARENT grid (see scheduling.layoutEventBlocks) rather than here, since
+// getting them right requires knowing about neighboring events: a short
+// event still needs a minimum height to stay legible, but that floor has
+// to be capped at whatever room is actually free before the next event
+// starts, or it visually bleeds into it even though the real data doesn't
+// overlap at all. zoom is passed alongside purely for scaling text/icons —
+// position and size are already baked into top/height by the time they get
+// here.
 // Dragging is pointer-based (not native HTML5 DnD) so the parent grid can
 // track motion continuously and animate other events out of the way live.
 // Locked events (fixed-time — a class, a meeting) never start a drag; the
 // grid's push-layout math also keeps everything else from landing on them.
-export default function EventBlock({ event, color, dayStartHour, hourHeight = HOUR_HEIGHT_PX, isDragging, linkedStats, onPointerDownEvent, onEventClick }) {
-  const zoom = hourHeight / HOUR_HEIGHT_PX;
-  const top = (event.start - dayStartHour) * hourHeight;
-  const height = Math.max(22 * zoom, event.duration * hourHeight - 2);
+export default function EventBlock({ event, color, top, height, zoom = 1, isDragging, linkedStats, onPointerDownEvent, onEventClick }) {
   const textColor = event.isSleep ? "#E7E9E3" : COLORS.ink;
   const faintColor = event.isSleep ? "#9BA39A" : COLORS.inkFaint;
   // Scales gently with zoom (clamped) so zoomed-in events read as visibly
@@ -45,9 +42,15 @@ export default function EventBlock({ event, color, dayStartHour, hourHeight = HO
       style={{
         top,
         height,
-        background: event.isSleep ? COLORS.sleep : event.done ? "#F4F3EE" : COLORS.panel,
-        border: `1px solid ${event.isSleep ? COLORS.sleep : COLORS.line}`,
-        borderLeft: event.isSleep ? `3px solid ${COLORS.sleep}` : `3px solid ${color}`,
+        background: event.isTransit
+          ? `repeating-linear-gradient(135deg, ${COLORS.panel}, ${COLORS.panel} 5px, ${COLORS.canvas} 5px, ${COLORS.canvas} 10px)`
+          : event.isSleep
+          ? COLORS.sleep
+          : event.done
+          ? "#F4F3EE"
+          : COLORS.panel,
+        border: `1px ${event.isTransit ? "dashed" : "solid"} ${event.isSleep ? COLORS.sleep : COLORS.line}`,
+        borderLeft: event.isSleep ? `3px solid ${COLORS.sleep}` : `3px ${event.isTransit ? "dashed" : "solid"} ${event.isTransit ? COLORS.inkFaint : color}`,
         opacity: event.done && !event.isSleep ? 0.6 : 1,
         cursor: event.locked ? "default" : isDragging ? "grabbing" : "grab",
         boxShadow: isDragging ? "0 8px 20px rgba(35,41,32,0.18)" : "none",
@@ -60,6 +63,7 @@ export default function EventBlock({ event, color, dayStartHour, hourHeight = HO
     >
       <div className="flex items-center gap-1">
         {event.isSleep && <Moon size={Math.round(11 * zoom)} className="flex-shrink-0" />}
+        {event.isTransit && <Car size={Math.round(11 * zoom)} color={faintColor} className="flex-shrink-0" />}
         <span
           className="font-medium truncate flex-1"
           style={{ fontSize: titleSize, textDecoration: event.done && !event.isSleep ? "line-through" : "none" }}
