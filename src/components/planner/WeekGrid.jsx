@@ -55,9 +55,12 @@ export default function WeekGrid({
   onMoveEvent,
   onSwapEvents,
   draggingPreset,
+  zoom = 1,
 }) {
   const scrollRef = useRef(null);
-  const gridHeight = HOURS.length * HOUR_HEIGHT_PX;
+  const hourHeight = HOUR_HEIGHT_PX * zoom;
+  const gridHeight = HOURS.length * hourHeight;
+  const titleSize = Math.round(Math.min(13, Math.max(10, 11 * zoom)));
 
   // The event (if any) currently being dragged FROM this grid.
   const [dragEvent, setDragEvent] = useState(null); // null | { id, duration }
@@ -72,13 +75,26 @@ export default function WeekGrid({
   const hoverDayEvents = hover ? allItems.filter((i) => i.date === hover.dateKey && i.kind === "event" && i.id !== ghost?.id) : [];
   const hoverInvalid = hover && ghost ? overlapsLocked(hover.hour, ghost.duration, hoverDayEvents) : false;
 
+  // Same reasoning as CalendarGrid: only reset to the default scroll hour
+  // on mount, rescale proportionally on every later hourHeight change (i.e.
+  // a zoom change) so zooming doesn't relocate you to a different part of
+  // the day.
+  const prevHourHeightRef = useRef(hourHeight);
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = DEFAULT_SCROLL_HOUR * HOUR_HEIGHT_PX;
-  }, []);
+    const el = scrollRef.current;
+    if (!el) return;
+    if (prevHourHeightRef.current === hourHeight) {
+      el.scrollTop = DEFAULT_SCROLL_HOUR * hourHeight;
+    } else {
+      el.scrollTop *= hourHeight / prevHourHeightRef.current;
+    }
+    prevHourHeightRef.current = hourHeight;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hourHeight]);
 
   function snappedHourFromEvent(e) {
     const rect = e.currentTarget.getBoundingClientRect();
-    const rawHour = DAY_START_HOUR + (e.clientY - rect.top) / HOUR_HEIGHT_PX;
+    const rawHour = DAY_START_HOUR + (e.clientY - rect.top) / hourHeight;
     return Math.max(DAY_START_HOUR, snapToQuarterHour(rawHour));
   }
 
@@ -153,7 +169,7 @@ export default function WeekGrid({
         <div className="flex">
           <div className="w-14 flex-shrink-0" style={{ height: gridHeight }}>
             {HOURS.map((h) => (
-              <div key={h} className="font-mono text-[10px] text-right pr-2" style={{ height: HOUR_HEIGHT_PX, color: COLORS.inkFaint, transform: "translateY(-6px)" }}>
+              <div key={h} className="font-mono text-[10px] text-right pr-2" style={{ height: hourHeight, color: COLORS.inkFaint, transform: "translateY(-6px)" }}>
                 {formatHour(h)}
               </div>
             ))}
@@ -174,7 +190,7 @@ export default function WeekGrid({
                 }}
                 onClick={(e) => {
                   const rect = e.currentTarget.getBoundingClientRect();
-                  const rawHour = DAY_START_HOUR + (e.clientY - rect.top) / HOUR_HEIGHT_PX;
+                  const rawHour = DAY_START_HOUR + (e.clientY - rect.top) / hourHeight;
                   onSlotClick(d, Math.round(rawHour * 4) / 4);
                 }}
                 onDragOver={(e) => handleColumnDragOver(e, dk)}
@@ -184,12 +200,12 @@ export default function WeekGrid({
                 onDrop={(e) => handleColumnDrop(e, d)}
               >
                 {HOURS.map((h, idx) => (
-                  <div key={h} className="absolute left-0 right-0" style={{ top: idx * HOUR_HEIGHT_PX, borderTop: `1px solid ${COLORS.line}` }} />
+                  <div key={h} className="absolute left-0 right-0" style={{ top: idx * hourHeight, borderTop: `1px solid ${COLORS.line}` }} />
                 ))}
 
                 {dayEvents.map((ev) => {
-                  const top = (ev.start - DAY_START_HOUR) * HOUR_HEIGHT_PX;
-                  const height = Math.max(18, ev.duration * HOUR_HEIGHT_PX - 2);
+                  const top = (ev.start - DAY_START_HOUR) * hourHeight;
+                  const height = Math.max(18 * zoom, ev.duration * hourHeight - 2);
                   return (
                     <div
                       key={ev.id}
@@ -221,8 +237,8 @@ export default function WeekGrid({
                     >
                       <div className="flex items-center gap-1">
                         <span
-                          className="text-[11px] font-medium truncate flex-1"
-                          style={{ textDecoration: ev.done && !ev.isSleep ? "line-through" : "none" }}
+                          className="font-medium truncate flex-1"
+                          style={{ fontSize: titleSize, textDecoration: ev.done && !ev.isSleep ? "line-through" : "none" }}
                         >
                           {ev.title}
                         </span>
@@ -241,8 +257,8 @@ export default function WeekGrid({
                   <div
                     className="absolute left-0.5 right-0.5 rounded px-1.5 py-0.5 overflow-hidden pointer-events-none"
                     style={{
-                      top: (hover.hour - DAY_START_HOUR) * HOUR_HEIGHT_PX,
-                      height: Math.max(18, ghost.duration * HOUR_HEIGHT_PX - 2),
+                      top: (hover.hour - DAY_START_HOUR) * hourHeight,
+                      height: Math.max(18 * zoom, ghost.duration * hourHeight - 2),
                       background: hoverInvalid ? "rgba(226,102,31,0.15)" : "rgba(31,61,46,0.12)",
                       border: `2px dashed ${hoverInvalid ? COLORS.blaze : COLORS.forest}`,
                       zIndex: 5,

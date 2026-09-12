@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { COLORS, FONT_IMPORT_URL } from "./constants/theme";
+import { COLORS, FONT_IMPORT_URL, ZOOM_LEVELS, DEFAULT_ZOOM_INDEX } from "./constants/theme";
 import { daysBetween, dateKey } from "./utils/date";
 import { getWeekDates, getMonthGridDates, getMonthDates, getYearMonths } from "./utils/calendarRange";
 import { useGoals } from "./hooks/useGoals";
@@ -77,6 +77,20 @@ export default function App() {
   const [milestoneModal, setMilestoneModal] = useState(null); // null | { goal, initial }
   const [sleepModalOpen, setSleepModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
+
+  // Zoom level for the day/week hour grids — an index into ZOOM_LEVELS
+  // rather than a free-floating number, so zoom in/out always lands on the
+  // same predictable steps. Shared across both views (rather than one per
+  // view) since switching between them mid-session should keep whatever
+  // zoom you'd already set.
+  const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
+  const zoom = ZOOM_LEVELS[zoomIndex];
+  function zoomIn() {
+    setZoomIndex((i) => Math.min(i + 1, ZOOM_LEVELS.length - 1));
+  }
+  function zoomOut() {
+    setZoomIndex((i) => Math.max(i - 1, 0));
+  }
 
   const weekDates = useMemo(() => getWeekDates(currentDate), [currentDate]);
   const monthGridDates = useMemo(() => getMonthGridDates(currentDate), [currentDate]);
@@ -247,6 +261,11 @@ export default function App() {
         onOpenSleepSchedule={() => setSleepModalOpen(true)}
         onOpenImport={() => setImportModalOpen(true)}
         compact={isMobile}
+        zoomPercent={Math.round(zoom * 100)}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        zoomDisabledIn={zoomIndex === ZOOM_LEVELS.length - 1}
+        zoomDisabledOut={zoomIndex === 0}
       />
 
       {isMobile ? (
@@ -311,6 +330,7 @@ export default function App() {
               onRescheduleEvents={rescheduleEvents}
               onSlotClick={openCreateEvent}
               onEventClick={openEditItem}
+              zoom={zoom}
             />
           )}
           {view === "week" && (
@@ -323,6 +343,7 @@ export default function App() {
               onDayHeaderClick={jumpToDay}
               onDropPreset={handleDropPreset}
               onMoveEvent={moveEvent}
+              zoom={zoom}
               onSwapEvents={swapEvents}
               draggingPreset={draggingPreset}
             />

@@ -1,5 +1,5 @@
 import React from "react";
-import { Flag, ChevronLeft, ChevronRight, Moon, Upload } from "lucide-react";
+import { Flag, ChevronLeft, ChevronRight, Moon, Upload, Minus, Plus } from "lucide-react";
 import { COLORS, CALENDAR_VIEWS } from "../constants/theme";
 import { formatDateHeading } from "../utils/date";
 import { formatMonthYear, formatWeekRange } from "../utils/calendarRange";
@@ -16,7 +16,27 @@ export function rangeLabel(date, view) {
 // Calendar tab's own header there instead (they're only relevant on that
 // one tab, whereas this header is shared across all tabs), so this just
 // shows the logo and the two global actions.
-export default function Header({ currentDate, view, onSetView, onPrev, onNext, onToday, onOpenSleepSchedule, onOpenImport, compact }) {
+//
+// zoomPercent/onZoomIn/onZoomOut control the day/week hour grids' zoom
+// (see theme.ZOOM_LEVELS) — only shown for those two views since month/year
+// don't have an hourly grid for it to apply to.
+export default function Header({
+  currentDate,
+  view,
+  onSetView,
+  onPrev,
+  onNext,
+  onToday,
+  onOpenSleepSchedule,
+  onOpenImport,
+  compact,
+  zoomPercent,
+  onZoomIn,
+  onZoomOut,
+  zoomDisabledIn,
+  zoomDisabledOut,
+}) {
+  const showZoom = !compact && (view === "day" || view === "week");
   return (
     <header
       className="flex items-center justify-between px-6 py-4 flex-shrink-0 flex-wrap gap-3"
@@ -47,6 +67,32 @@ export default function Header({ currentDate, view, onSetView, onPrev, onNext, o
           >
             Today
           </button>
+
+          {showZoom && (
+            <div className="flex items-center rounded-md border overflow-hidden ml-1" style={{ borderColor: COLORS.line }}>
+              <button
+                onClick={onZoomOut}
+                disabled={zoomDisabledOut}
+                className="p-1.5 hover:bg-black/5 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                aria-label="Zoom out"
+                title="Zoom out"
+              >
+                <Minus size={13} />
+              </button>
+              <span className="w-10 text-center text-xs" style={{ color: COLORS.ink }}>
+                {zoomPercent}%
+              </span>
+              <button
+                onClick={onZoomIn}
+                disabled={zoomDisabledIn}
+                className="p-1.5 hover:bg-black/5 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                aria-label="Zoom in"
+                title="Zoom in"
+              >
+                <Plus size={13} />
+              </button>
+            </div>
+          )}
         </div>
       )}
 

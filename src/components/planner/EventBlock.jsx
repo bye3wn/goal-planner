@@ -1,19 +1,30 @@
 import React from "react";
-import { Repeat, ListChecks, Moon, MapPin, Lock } from "lucide-react";
+import { Repeat, ListChecks, Moon, MapPin, Lock, AlignLeft } from "lucide-react";
 import { COLORS, HOUR_HEIGHT_PX } from "../../constants/theme";
 import { formatTime } from "../../utils/date";
 
 // Absolutely positioned within the grid — top and height are computed from
 // start/duration so the block's size visually matches how long it takes.
+// hourHeight is the CURRENT zoomed pixels-per-hour (HOUR_HEIGHT_PX * the
+// active zoom factor, from theme.ZOOM_LEVELS) — passed down rather than
+// imported directly so the block resizes when the grid is zoomed. There's
+// no separate "detail level" concept: the existing height thresholds below
+// (for time, location, description) just naturally clear or miss as the
+// block gets taller or shorter with zoom, which is what makes zoomed-in
+// events show more and zoomed-out ones show less without extra state.
 // Dragging is pointer-based (not native HTML5 DnD) so the parent grid can
 // track motion continuously and animate other events out of the way live.
 // Locked events (fixed-time — a class, a meeting) never start a drag; the
 // grid's push-layout math also keeps everything else from landing on them.
-export default function EventBlock({ event, color, dayStartHour, isDragging, linkedStats, onPointerDownEvent, onEventClick }) {
-  const top = (event.start - dayStartHour) * HOUR_HEIGHT_PX;
-  const height = Math.max(22, event.duration * HOUR_HEIGHT_PX - 2);
+export default function EventBlock({ event, color, dayStartHour, hourHeight = HOUR_HEIGHT_PX, isDragging, linkedStats, onPointerDownEvent, onEventClick }) {
+  const zoom = hourHeight / HOUR_HEIGHT_PX;
+  const top = (event.start - dayStartHour) * hourHeight;
+  const height = Math.max(22 * zoom, event.duration * hourHeight - 2);
   const textColor = event.isSleep ? "#E7E9E3" : COLORS.ink;
   const faintColor = event.isSleep ? "#9BA39A" : COLORS.inkFaint;
+  // Scales gently with zoom (clamped) so zoomed-in events read as visibly
+  // bigger/easier to read, not just taller.
+  const titleSize = Math.round(Math.min(15, Math.max(11, 12 * zoom)));
 
   return (
     <div
@@ -48,8 +59,11 @@ export default function EventBlock({ event, color, dayStartHour, isDragging, lin
       }}
     >
       <div className="flex items-center gap-1">
-        {event.isSleep && <Moon size={11} className="flex-shrink-0" />}
-        <span className="text-xs font-medium truncate flex-1" style={{ textDecoration: event.done && !event.isSleep ? "line-through" : "none" }}>
+        {event.isSleep && <Moon size={Math.round(11 * zoom)} className="flex-shrink-0" />}
+        <span
+          className="font-medium truncate flex-1"
+          style={{ fontSize: titleSize, textDecoration: event.done && !event.isSleep ? "line-through" : "none" }}
+        >
           {event.title}
         </span>
         {event.locked && <Lock size={10} color={faintColor} className="flex-shrink-0" />}
@@ -72,6 +86,16 @@ export default function EventBlock({ event, color, dayStartHour, isDragging, lin
           <MapPin size={9} color={faintColor} className="flex-shrink-0" />
           <span className="text-[10px] truncate" style={{ color: faintColor }}>
             {event.location}
+          </span>
+        </div>
+      )}
+      {/* Only surfaces once there's enough room to not just be clutter —
+          i.e. zoomed in far enough on a long-enough event. */}
+      {height > 90 && event.description && (
+        <div className="flex items-start gap-1 mt-1">
+          <AlignLeft size={9} color={faintColor} className="flex-shrink-0 mt-0.5" />
+          <span className="text-[10px] line-clamp-2" style={{ color: faintColor }}>
+            {event.description}
           </span>
         </div>
       )}

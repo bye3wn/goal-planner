@@ -48,10 +48,22 @@ export const HOURS = Array.from(
   (_, i) => i + DAY_START_HOUR
 );
 
-// Pixel height of one hour in the calendar grid. Event block height is
-// duration (in hours) * this value, so blocks are visually proportional to
-// how long the event actually takes — same idea as Google Calendar.
+// Pixel height of one hour in the calendar grid AT 1x ZOOM. Event block
+// height is duration (in hours) * this value * the current zoom factor, so
+// blocks are visually proportional to how long the event actually takes —
+// same idea as Google Calendar — and scale together with the hour rows
+// when the user zooms the day/week grid in or out (see ZOOM_LEVELS).
 export const HOUR_HEIGHT_PX = 52;
+
+// Stepped zoom factors for the day/week grids, applied as a multiplier on
+// HOUR_HEIGHT_PX. Index into this array (rather than a free-floating
+// number) so zoom in/out always lands on the same predictable stops.
+// Zooming out shrinks event blocks enough that they naturally drop below
+// EventBlock's own detail thresholds (time, location, etc.) — there's no
+// separate "less detail" flag, it falls out of the existing
+// height-based show/hide logic once blocks are smaller.
+export const ZOOM_LEVELS = [0.6, 0.8, 1, 1.25, 1.5, 1.75, 2];
+export const DEFAULT_ZOOM_INDEX = ZOOM_LEVELS.indexOf(1);
 
 export const REPEAT_OPTIONS = [
   { value: "none", label: "Does not repeat" },

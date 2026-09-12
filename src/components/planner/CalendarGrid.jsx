@@ -17,14 +17,35 @@ const DEFAULT_SCROLL_HOUR = 7;
 // continuously (not native HTML5 DnD), snaps to 15-minute increments, and
 // live-previews a "push everything below out of the way" layout so you can
 // see exactly where things will land before you let go.
-export default function CalendarGrid({ events, dayTasks, goalColor, onRescheduleEvents, onSlotClick, onEventClick }) {
+//
+// zoom is a multiplier on HOUR_HEIGHT_PX (see theme.ZOOM_LEVELS) — every
+// pixel measurement in this component is derived from the resulting
+// hourHeight rather than the fixed constant, so zooming in/out widens or
+// narrows the hour rows AND scales event blocks (and, via EventBlock's own
+// height thresholds, how much detail they show) together.
+export default function CalendarGrid({ events, dayTasks, goalColor, onRescheduleEvents, onSlotClick, onEventClick, zoom = 1 }) {
   const gridRef = useRef(null);
   const scrollRef = useRef(null);
-  const gridHeight = HOURS.length * HOUR_HEIGHT_PX;
+  const hourHeight = HOUR_HEIGHT_PX * zoom;
+  const gridHeight = HOURS.length * hourHeight;
 
+  // On mount, start at a reasonable hour instead of dropping you at
+  // midnight. On every later change (only zoom changes hourHeight after
+  // mount), rescale the scroll position by the same ratio instead of
+  // jumping back to DEFAULT_SCROLL_HOUR, so zooming keeps roughly the same
+  // hours in view rather than relocating you.
+  const prevHourHeightRef = useRef(hourHeight);
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = DEFAULT_SCROLL_HOUR * HOUR_HEIGHT_PX;
-  }, []);
+    const el = scrollRef.current;
+    if (!el) return;
+    if (prevHourHeightRef.current === hourHeight) {
+      el.scrollTop = DEFAULT_SCROLL_HOUR * hourHeight;
+    } else {
+      el.scrollTop *= hourHeight / prevHourHeightRef.current;
+    }
+    prevHourHeightRef.current = hourHeight;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hourHeight]);
 
   // drag: { id, duration, pointerOffsetY, startClientY, currentStart, moved }
   const [drag, setDrag] = useState(null);
@@ -44,7 +65,7 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
 
   function clientYToHour(clientY) {
     const rect = gridRef.current.getBoundingClientRect();
-    return DAY_START_HOUR + (clientY - rect.top) / HOUR_HEIGHT_PX;
+    return DAY_START_HOUR + (clientY - rect.top) / hourHeight;
   }
 
   function handleEventPointerDown(e, event, blockTopPx) {
@@ -67,7 +88,7 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
     const movedPx = Math.abs(e.clientY - drag.startClientY);
     const rect = gridRef.current.getBoundingClientRect();
     const topPx = e.clientY - rect.top - drag.pointerOffsetY;
-    const rawHour = DAY_START_HOUR + topPx / HOUR_HEIGHT_PX;
+    const rawHour = DAY_START_HOUR + topPx / hourHeight;
     const snapped = Math.max(DAY_START_HOUR, Math.min(DAY_END_HOUR - 0.25, snapToQuarterHour(rawHour)));
     setDrag((d) => (d ? { ...d, currentStart: snapped, moved: d.moved || movedPx > DRAG_THRESHOLD_PX } : d));
   }
@@ -108,7 +129,7 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
         {/* Hour labels */}
         <div className="w-16 flex-shrink-0" style={{ height: gridHeight }}>
           {HOURS.map((h) => (
-            <div key={h} className="font-mono text-[11px] text-right pr-3" style={{ height: HOUR_HEIGHT_PX, color: COLORS.inkFaint, transform: "translateY(-6px)" }}>
+            <div key={h} className="font-mono text-[11px] text-right pr-3" style={{ height: hourHeight, color: COLORS.inkFaint, transform: "translateY(-6px)" }}>
               {formatHour(h)}
             </div>
           ))}
@@ -127,7 +148,7 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
             <div
               key={h}
               className="absolute left-0 right-0 flex items-start justify-end group"
-              style={{ top: idx * HOUR_HEIGHT_PX, height: HOUR_HEIGHT_PX, borderTop: `1px solid ${COLORS.line}` }}
+              style={{ top: idx * hourHeight, height: hourHeight, borderTop: `1px solid ${COLORS.line}` }}
             >
               <Plus size={13} color={COLORS.inkFaint} className="opacity-0 group-hover:opacity-100 transition-opacity mt-1 mr-1" />
             </div>
@@ -143,6 +164,7 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
                 event={ev}
                 color={goalColor(ev.goalId)}
                 dayStartHour={DAY_START_HOUR}
+                hourHeight={hourHeight}
                 isDragging={drag?.id === ev.id}
                 linkedStats={linkedStats}
                 onPointerDownEvent={handleEventPointerDown}
@@ -158,7 +180,7 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
             <div
               className="absolute right-2 font-mono text-[11px] px-2 py-0.5 rounded pointer-events-none"
               style={{
-                top: (drag.currentStart - DAY_START_HOUR) * HOUR_HEIGHT_PX - 20,
+                top: (drag.currentStart - DAY_START_HOUR) * hourHeight - 20,
                 background: COLORS.forest,
                 color: "#fff",
                 zIndex: 30,
