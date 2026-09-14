@@ -222,6 +222,35 @@ export function usePlanner({ onItemContribution } = {}) {
     updateItemsAt(dateKeyStr, (its) => its.map((i) => (startById.has(i.id) ? { ...i, start: startById.get(i.id) } : i)));
   }
 
+  // Exclusively assigns a task to one event, dropping it from wherever it
+  // was linked before — dragging a task (from the tasks list, or from the
+  // event it's already attached to) onto a different event moves the
+  // assignment rather than stacking up a second link, the way dragging a
+  // sticky note to a new spot takes it off the old one. Scans every date's
+  // events rather than just the target's, since the task could currently
+  // be linked to an event on a different day. itemsByDate is the one
+  // shared source of truth behind both the day and week views, so an
+  // assignment made while looking at the week updates the exact same
+  // event object the day view would show for that date — there's no
+  // separate per-view copy to keep in sync.
+  function assignTaskToEvent(taskId, eventId) {
+    setItemsByDate((prev) => {
+      const next = {};
+      for (const [dk, arr] of Object.entries(prev)) {
+        next[dk] = arr.map((i) => {
+          if (i.kind !== "event") return i;
+          const linked = i.linkedTaskIds || [];
+          const isLinkedHere = linked.includes(taskId);
+          if (i.id === eventId) {
+            return isLinkedHere ? i : { ...i, linkedTaskIds: [...linked, taskId] };
+          }
+          return isLinkedHere ? { ...i, linkedTaskIds: linked.filter((id) => id !== taskId) } : i;
+        });
+      }
+      return next;
+    });
+  }
+
   // Pre-made events for the week view's drag-and-drop list. A preset has no
   // date of its own — dragging it onto the grid stamps out a real event via
   // createEventFromPreset, leaving the preset itself reusable. Presets are
@@ -507,6 +536,7 @@ export function usePlanner({ onItemContribution } = {}) {
     toggleItemDone,
     deleteItem,
     rescheduleEvents,
+    assignTaskToEvent,
     saveSleepSchedule,
     getSleepSchedule,
     importEvents,

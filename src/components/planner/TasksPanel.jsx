@@ -4,10 +4,26 @@ import { COLORS, MONTH_LABELS } from "../../constants/theme";
 import { dateKey } from "../../utils/date";
 import { getWeekDates, getMonthDates, getYearMonths, formatDayShort } from "../../utils/calendarRange";
 
-function TaskRow({ t, goalColor, onToggleDone, onTaskClick }) {
+// draggable is only true in day/week view (see TasksPanel below) — dragging
+// a task onto an event is how you assign it there; month/year views don't
+// show individual event blocks worth dropping onto, so dragging is off.
+function TaskRow({ t, goalColor, onToggleDone, onTaskClick, draggable }) {
   const color = goalColor(t.goalId);
   return (
-    <div className="flex items-start gap-2 px-2 py-1.5 rounded-md" style={{ background: t.done ? "#F4F3EE" : "transparent" }}>
+    <div
+      draggable={draggable}
+      onDragStart={
+        draggable
+          ? (e) => {
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("application/json", JSON.stringify({ type: "task", taskId: t.id }));
+            }
+          : undefined
+      }
+      className="flex items-start gap-2 px-2 py-1.5 rounded-md"
+      style={{ background: t.done ? "#F4F3EE" : "transparent", cursor: draggable ? "grab" : "default" }}
+      title={draggable ? "Drag onto an event to assign it there" : undefined}
+    >
       <button onClick={() => onToggleDone(t.id)} className="flex-shrink-0 mt-0.5">
         {t.done ? <CheckCircle2 size={16} color={color} /> : <Circle size={16} color={COLORS.inkFaint} />}
       </button>
@@ -31,13 +47,27 @@ function TaskRow({ t, goalColor, onToggleDone, onTaskClick }) {
 // tracks the active view: 1 in day view, up to 7 in week, the days-due in
 // month, all 365ish in year. Click to open today's instance (or the first
 // one in range) for editing — no per-day breakdown, just the fraction.
-function RepeatingGroupRow({ group, goalColor, onTaskClick }) {
+function RepeatingGroupRow({ group, goalColor, onTaskClick, draggable }) {
   const color = goalColor(group.instances[0]?.goalId);
   const today = dateKey(new Date());
   const representative = group.instances.find((i) => i.date === today) || group.instances[0];
 
   return (
-    <button onClick={() => onTaskClick(representative)} className="w-full flex items-center gap-1.5 py-1 text-left">
+    <button
+      draggable={draggable}
+      onDragStart={
+        draggable
+          ? (e) => {
+              e.dataTransfer.effectAllowed = "move";
+              e.dataTransfer.setData("application/json", JSON.stringify({ type: "task", taskId: representative.id }));
+            }
+          : undefined
+      }
+      onClick={() => onTaskClick(representative)}
+      className="w-full flex items-center gap-1.5 py-1 text-left"
+      style={{ cursor: draggable ? "grab" : "pointer" }}
+      title={draggable ? "Drag onto an event to assign it there" : undefined}
+    >
       <Repeat size={12} color={COLORS.inkFaint} className="flex-shrink-0" />
       <span className="flex-1 text-sm truncate min-w-0">{group.title}</span>
       <span className="font-mono text-[11px] flex-shrink-0" style={{ color: group.doneCount === group.total ? color : COLORS.inkFaint }}>
@@ -75,6 +105,10 @@ function splitRepeating(taskList) {
 // only ever a handful of days), by month for year (365 date headers would
 // be unreadable).
 export default function TasksPanel({ view, currentDate, allItems, goalColor, onToggleDone, onTaskClick, onAddTask, onJumpToDay, fullWidth }) {
+  // Assigning a task to an event by dragging is a day/week-view thing —
+  // month and year don't render individual event blocks worth dropping a
+  // task onto.
+  const canAssign = view === "day" || view === "week";
   const dayKey = dateKey(currentDate);
   const allTasks = useMemo(() => allItems.filter((i) => i.kind === "task"), [allItems]);
   const dayList = useMemo(() => allTasks.filter((t) => t.date === dayKey), [allTasks, dayKey]);
@@ -129,7 +163,7 @@ export default function TasksPanel({ view, currentDate, allItems, goalColor, onT
           )}
           <div className="flex flex-col gap-1">
             {dayList.map((t) => (
-              <TaskRow key={t.id} t={t} goalColor={goalColor} onToggleDone={onToggleDone} onTaskClick={onTaskClick} />
+              <TaskRow key={t.id} t={t} goalColor={goalColor} onToggleDone={onToggleDone} onTaskClick={onTaskClick} draggable={canAssign} />
             ))}
           </div>
         </>
@@ -149,7 +183,7 @@ export default function TasksPanel({ view, currentDate, allItems, goalColor, onT
                 Repeating
               </div>
               {rangeData.groups.map((g) => (
-                <RepeatingGroupRow key={g.templateId} group={g} goalColor={goalColor} onTaskClick={onTaskClick} />
+                <RepeatingGroupRow key={g.templateId} group={g} goalColor={goalColor} onTaskClick={onTaskClick} draggable={canAssign} />
               ))}
             </div>
           )}
@@ -174,7 +208,7 @@ export default function TasksPanel({ view, currentDate, allItems, goalColor, onT
                   </div>
                   <div className="flex flex-col gap-1">
                     {g.tasks.map((t) => (
-                      <TaskRow key={t.id} t={t} goalColor={goalColor} onToggleDone={onToggleDone} onTaskClick={onTaskClick} />
+                      <TaskRow key={t.id} t={t} goalColor={goalColor} onToggleDone={onToggleDone} onTaskClick={onTaskClick} draggable={canAssign} />
                     ))}
                   </div>
                 </div>

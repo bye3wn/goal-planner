@@ -28,7 +28,7 @@ const MIN_EVENT_HEIGHT_PX = 22;
 // hourHeight rather than the fixed constant, so zooming in/out widens or
 // narrows the hour rows AND scales event blocks (and, via EventBlock's own
 // height thresholds, how much detail they show) together.
-export default function CalendarGrid({ events, dayTasks, goalColor, onRescheduleEvents, onSlotClick, onEventClick, onAddTransit, zoom = 1 }) {
+export default function CalendarGrid({ events, dayTasks, goalColor, onRescheduleEvents, onSlotClick, onEventClick, onAddTransit, onAssignTask, zoom = 1 }) {
   const gridRef = useRef(null);
   const scrollRef = useRef(null);
   const hourHeight = HOUR_HEIGHT_PX * zoom;
@@ -159,6 +159,13 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
           onClick={handleGridClick}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
+          // A task dragged from the tasks panel can only be dropped ONTO an
+          // event (see EventBlock's own onDrop) — dropping it on empty grid
+          // space here is a no-op rather than an assignment. Still needs
+          // preventDefault so the browser doesn't fall back to its default
+          // drop behavior (e.g. trying to navigate to the dragged JSON text).
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => e.preventDefault()}
         >
           {HOURS.map((h, idx) => (
             <div
@@ -171,9 +178,9 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
           ))}
 
           {eventLayout.map(({ event: ev, top, height }) => {
-            const linkedStats = ev.linkedTaskIds?.length
-              ? { total: ev.linkedTaskIds.length, done: (dayTasks || []).filter((t) => ev.linkedTaskIds.includes(t.id) && t.done).length }
-              : null;
+            const linkedTasks = ev.linkedTaskIds?.length
+              ? (dayTasks || []).filter((t) => ev.linkedTaskIds.includes(t.id))
+              : [];
             return (
               <EventBlock
                 key={ev.id}
@@ -183,9 +190,10 @@ export default function CalendarGrid({ events, dayTasks, goalColor, onReschedule
                 height={height}
                 zoom={zoom}
                 isDragging={drag?.id === ev.id}
-                linkedStats={linkedStats}
+                linkedTasks={linkedTasks}
                 onPointerDownEvent={handleEventPointerDown}
                 onEventClick={onEventClick}
+                onAssignTask={onAssignTask}
               />
             );
           })}

@@ -61,6 +61,7 @@ export default function App() {
     toggleItemDone,
     deleteItem,
     rescheduleEvents,
+    assignTaskToEvent,
     saveSleepSchedule,
     getSleepSchedule,
     importEvents,
@@ -72,6 +73,14 @@ export default function App() {
     moveEvent,
     swapEvents,
   } = usePlanner({ onItemContribution: addMilestoneProgress });
+
+  // Linked-task lookup for the day view's event blocks needs every task,
+  // not just today's — a task assigned from week view can live on a
+  // different day than the event it's attached to (dragging one across
+  // days is exactly the "grab it from one event and give it to another"
+  // interaction), so scoping this to `tasks` (today only) would silently
+  // fail to render a cross-day assignment's chip.
+  const allTasksForLinking = useMemo(() => allItems.filter((i) => i.kind === "task"), [allItems]);
 
   const [itemModal, setItemModal] = useState(null); // null | { initial, targetDateKey }
   const [goalModal, setGoalModal] = useState(null); // null | { initial }
@@ -326,12 +335,13 @@ export default function App() {
           {view === "day" && (
             <CalendarGrid
               events={events}
-              dayTasks={tasks}
+              dayTasks={allTasksForLinking}
               goalColor={goalColor}
               onRescheduleEvents={rescheduleEvents}
               onSlotClick={openCreateEvent}
               onEventClick={openEditItem}
               onAddTransit={(start, duration) => createTransitEvent(dateKey(currentDate), start, duration)}
+              onAssignTask={assignTaskToEvent}
               zoom={zoom}
             />
           )}
@@ -346,6 +356,7 @@ export default function App() {
               onDropPreset={handleDropPreset}
               onMoveEvent={moveEvent}
               onAddTransit={(date, start, duration) => createTransitEvent(dateKey(date), start, duration)}
+              onAssignTask={assignTaskToEvent}
               zoom={zoom}
               onSwapEvents={swapEvents}
               draggingPreset={draggingPreset}

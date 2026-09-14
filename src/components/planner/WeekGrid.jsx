@@ -1,9 +1,10 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Lock, Car } from "lucide-react";
+import { Lock, Car, Circle, CheckCircle2 } from "lucide-react";
 import { COLORS, HOURS, HOUR_HEIGHT_PX, DAY_START_HOUR } from "../../constants/theme";
 import { formatHour, formatTime, formatDuration, dateKey } from "../../utils/date";
 import { isToday } from "../../utils/calendarRange";
 import { snapToQuarterHour, overlapsLocked, layoutEventBlocks, findTransitGaps } from "../../utils/scheduling";
+import { readDragPayload } from "../../utils/dnd";
 
 const DEFAULT_SCROLL_HOUR = 7;
 const MIN_EVENT_HEIGHT_PX = 18;
@@ -11,14 +12,7 @@ const MIN_EVENT_HEIGHT_PX = 18;
 // room for a text label, so this just gates whether the icon-only "add
 // transit" affordance is worth showing at all at the current zoom.
 const MIN_GAP_PX = 10;
-
-function readDragPayload(e) {
-  try {
-    return JSON.parse(e.dataTransfer.getData("application/json"));
-  } catch {
-    return null;
-  }
-}
+const MAX_VISIBLE_TASK_CHIPS = 2;
 
 // A lighter-weight sibling of the day grid: 7 columns instead of 1. Click
 // empty space to create, click an event to edit, click a day header to
@@ -60,6 +54,7 @@ export default function WeekGrid({
   onMoveEvent,
   onSwapEvents,
   onAddTransit,
+  onAssignTask,
   draggingPreset,
   zoom = 1,
 }) {
@@ -136,13 +131,20 @@ export default function WeekGrid({
     e.preventDefault();
     e.stopPropagation();
     const payload = readDragPayload(e);
-    if (payload && !targetEvent.locked) {
-      if (payload.type === "event" && onSwapEvents) {
-        if (payload.eventId !== targetEvent.id) onSwapEvents(payload.eventId, targetEvent.id);
-      } else if (payload.type === "preset" && onDropPreset) {
-        // Dropped a preset directly onto an existing event — schedule it
-        // at that event's start time rather than requiring pixel-perfect aim.
-        onDropPreset(payload.presetId, dateKey(d), targetEvent.start);
+    if (payload) {
+      // Assigning a task doesn't move or reschedule the event it lands on,
+      // so it's fine on a locked (fixed-time) event too — only the
+      // swap/preset-schedule branches below need to respect locking.
+      if (payload.type === "task" && onAssignTask) {
+        onAssignTask(payload.taskId, targetEvent.id);
+      } else if (!targetEvent.locked) {
+        if (payload.type === "event" && onSwapEvents) {
+          if (payload.eventId !== targetEvent.id) onSwapEvents(payload.eventId, targetEvent.id);
+        } else if (payload.type === "preset" && onDropPreset) {
+          // Dropped a preset directly onto an existing event — schedule it
+          // at that event's start time rather than requiring pixel-perfect aim.
+          onDropPreset(payload.presetId, dateKey(d), targetEvent.start);
+        }
       }
     }
     finishDrag();
@@ -184,6 +186,10 @@ export default function WeekGrid({
           {weekDates.map((d) => {
             const dk = dateKey(d);
             const dayEvents = allItems.filter((i) => i.date === dk && i.kind === "event");
+            // Not date-scoped: a linked task can live on a different day
+            // than its event (e.g. dragged across days), so resolving
+            // linkedTaskIds has to search every task, not just this day's.
+            const linkableTasks = allItems.filter((i) => i.kind === "task");
             const dayEventLayout = layoutEventBlocks(dayEvents, {
               hourHeight,
               dayStartHour: DAY_START_HOUR,
@@ -216,60 +222,109 @@ export default function WeekGrid({
                   <div key={h} className="absolute left-0 right-0" style={{ top: idx * hourHeight, borderTop: `1px solid ${COLORS.line}` }} />
                 ))}
 
-                {dayEventLayout.map(({ event: ev, top, height }) => (
-                  <div
-                    key={ev.id}
-                    draggable={!ev.locked}
-                    onDragStart={(e) => {
-                      e.stopPropagation();
-                      e.dataTransfer.effectAllowed = "move";
-                      e.dataTransfer.setData("application/json", JSON.stringify({ type: "event", eventId: ev.id }));
-                      setDragEvent({ id: ev.id, duration: ev.duration, title: ev.title });
-                    }}
-                    onDragEnd={finishDrag}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => handleEventDrop(e, ev, d)}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEventClick(ev, d);
-                    }}
-                    className="absolute left-0.5 right-0.5 rounded px-1.5 py-0.5 overflow-hidden"
-                    style={{
-                      top,
-                      height,
-                      background: ev.isTransit
-                        ? `repeating-linear-gradient(135deg, ${COLORS.panel}, ${COLORS.panel} 5px, ${COLORS.canvas} 5px, ${COLORS.canvas} 10px)`
-                        : ev.isSleep
-                        ? COLORS.sleep
-                        : ev.done
-                        ? "#F4F3EE"
-                        : COLORS.panel,
-                      border: `1px ${ev.isTransit ? "dashed" : "solid"} ${ev.isSleep ? COLORS.sleep : COLORS.line}`,
-                      borderLeft: ev.isSleep
-                        ? `3px solid ${COLORS.sleep}`
-                        : `3px ${ev.isTransit ? "dashed" : "solid"} ${ev.isTransit ? COLORS.inkFaint : goalColor(ev.goalId)}`,
-                      opacity: ev.done && !ev.isSleep ? 0.6 : 1,
-                      color: ev.isSleep ? "#E7E9E3" : COLORS.ink,
-                      cursor: ev.locked ? "default" : "grab",
-                    }}
-                  >
-                    <div className="flex items-center gap-1">
-                      {ev.isTransit && <Car size={10} color={ev.isSleep ? "#9BA39A" : COLORS.inkFaint} className="flex-shrink-0" />}
-                      <span
-                        className="font-medium truncate flex-1"
-                        style={{ fontSize: titleSize, textDecoration: ev.done && !ev.isSleep ? "line-through" : "none" }}
-                      >
-                        {ev.title}
-                      </span>
-                      {ev.locked && <Lock size={9} color={ev.isSleep ? "#9BA39A" : COLORS.inkFaint} className="flex-shrink-0" />}
-                    </div>
-                    {height > 30 && (
-                      <div className="font-mono text-[9px]" style={{ color: ev.isSleep ? "#9BA39A" : COLORS.inkFaint }}>
-                        {formatTime(ev.start)}
+                {dayEventLayout.map(({ event: ev, top, height }) => {
+                  const linkedTasks = ev.linkedTaskIds?.length
+                    ? linkableTasks.filter((t) => ev.linkedTaskIds.includes(t.id))
+                    : [];
+                  const doneCount = linkedTasks.filter((t) => t.done).length;
+                  return (
+                    <div
+                      key={ev.id}
+                      draggable={!ev.locked}
+                      onDragStart={(e) => {
+                        e.stopPropagation();
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("application/json", JSON.stringify({ type: "event", eventId: ev.id }));
+                        setDragEvent({ id: ev.id, duration: ev.duration, title: ev.title });
+                      }}
+                      onDragEnd={finishDrag}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => handleEventDrop(e, ev, d)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEventClick(ev, d);
+                      }}
+                      className="absolute left-0.5 right-0.5 rounded px-1.5 py-0.5 overflow-hidden"
+                      style={{
+                        top,
+                        height,
+                        background: ev.isTransit
+                          ? `repeating-linear-gradient(135deg, ${COLORS.panel}, ${COLORS.panel} 5px, ${COLORS.canvas} 5px, ${COLORS.canvas} 10px)`
+                          : ev.isSleep
+                          ? COLORS.sleep
+                          : ev.done
+                          ? "#F4F3EE"
+                          : COLORS.panel,
+                        border: `1px ${ev.isTransit ? "dashed" : "solid"} ${ev.isSleep ? COLORS.sleep : COLORS.line}`,
+                        borderLeft: ev.isSleep
+                          ? `3px solid ${COLORS.sleep}`
+                          : `3px ${ev.isTransit ? "dashed" : "solid"} ${ev.isTransit ? COLORS.inkFaint : goalColor(ev.goalId)}`,
+                        opacity: ev.done && !ev.isSleep ? 0.6 : 1,
+                        color: ev.isSleep ? "#E7E9E3" : COLORS.ink,
+                        cursor: ev.locked ? "default" : "grab",
+                      }}
+                    >
+                      <div className="flex items-center gap-1">
+                        {ev.isTransit && <Car size={10} color={ev.isSleep ? "#9BA39A" : COLORS.inkFaint} className="flex-shrink-0" />}
+                        <span
+                          className="font-medium truncate flex-1"
+                          style={{ fontSize: titleSize, textDecoration: ev.done && !ev.isSleep ? "line-through" : "none" }}
+                        >
+                          {ev.title}
+                        </span>
+                        {ev.locked && <Lock size={9} color={ev.isSleep ? "#9BA39A" : COLORS.inkFaint} className="flex-shrink-0" />}
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {height > 30 && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-[9px]" style={{ color: ev.isSleep ? "#9BA39A" : COLORS.inkFaint }}>
+                            {formatTime(ev.start)}
+                          </span>
+                          {linkedTasks.length > 0 && height <= 45 && (
+                            <span className="font-mono text-[9px]" style={{ color: ev.isSleep ? "#9BA39A" : COLORS.inkFaint }}>
+                              {doneCount}/{linkedTasks.length}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {/* Individual draggable task chips once there's real
+                          room — a week column is narrow, so this needs more
+                          height than the day view's equivalent before it's
+                          worth showing over the compact fraction above. */}
+                      {height > 45 && linkedTasks.length > 0 && (
+                        <div className="flex flex-col gap-0.5 mt-0.5">
+                          {linkedTasks.slice(0, MAX_VISIBLE_TASK_CHIPS).map((t) => (
+                            <div
+                              key={t.id}
+                              draggable
+                              onClick={(e) => e.stopPropagation()}
+                              onDragStart={(e) => {
+                                e.stopPropagation();
+                                e.dataTransfer.effectAllowed = "move";
+                                e.dataTransfer.setData("application/json", JSON.stringify({ type: "task", taskId: t.id }));
+                              }}
+                              className="flex items-center gap-0.5 rounded px-0.5 cursor-grab"
+                              style={{ background: "rgba(0,0,0,0.04)" }}
+                              title="Drag to move this task to another event"
+                            >
+                              {t.done ? <CheckCircle2 size={8} color={COLORS.inkFaint} /> : <Circle size={8} color={COLORS.inkFaint} />}
+                              <span
+                                className="text-[9px] truncate"
+                                style={{ color: COLORS.inkFaint, textDecoration: t.done ? "line-through" : "none" }}
+                              >
+                                {t.title}
+                              </span>
+                            </div>
+                          ))}
+                          {linkedTasks.length > MAX_VISIBLE_TASK_CHIPS && (
+                            <span className="text-[8px]" style={{ color: COLORS.inkFaint }}>
+                              +{linkedTasks.length - MAX_VISIBLE_TASK_CHIPS} more
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
 
                 {/* Icon-only "add transit" affordance — a week column is too
                     narrow for the day view's text label. A small pill
